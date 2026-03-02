@@ -1,0 +1,31 @@
+CompileFlags:
+  # Use compile_commands.json from build directory
+  CompilationDatabase: build
+
+Diagnostics:
+  # Disable some overly aggressive warnings
+  UnusedIncludes: None
+  MissingIncludes: Strict
+
+  # Clang-Tidy checks
+  ClangTidy:
+    Add:
+      - modernize-*
+      - performance-*
+      - readability-*
+      - bugprone-*
+    Remove:
+      - modernize-use-trailing-return-type
+      - readability-identifier-length
+      - readability-magic-numbers
+
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+
+Hover:
+  ShowAKA: Yes
+
+Completion:
+  AllScopes: Yes

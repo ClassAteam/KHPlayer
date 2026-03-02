@@ -1,0 +1,10 @@
+# Helix will respect this file even without git
+build/
+bin/
+*.o
+*.so
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
