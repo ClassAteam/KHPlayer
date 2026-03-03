@@ -5,19 +5,18 @@ CompileFlags:
 Diagnostics:
   # Disable some overly aggressive warnings
   UnusedIncludes: None
-  MissingIncludes: Strict
 
   # Clang-Tidy checks
   ClangTidy:
     Add:
-      - modernize-*
-      - performance-*
-      - readability-*
-      - bugprone-*
+      - bugprone-*           # Only keep bug-prone checks (most important)
+      - performance-*         # Performance issues
+      - clang-analyzer-*      # Static analyzer (real bugs)
     Remove:
-      - modernize-use-trailing-return-type
-      - readability-identifier-length
-      - readability-magic-numbers
+      # Remove all the noisy readability/style checks
+      - bugprone-easily-swappable-parameters
+      - bugprone-narrowing-conversions  # Too noisy with FFmpeg APIs
+      - bugprone-implicit-widening-of-multiplication-result
 
 InlayHints:
   Enabled: Yes

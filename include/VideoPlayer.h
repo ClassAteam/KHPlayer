@@ -33,10 +33,10 @@ public:
     void stop();
     void seek(double seconds);
 
-    bool isPlaying() const { return playing_; }
-    bool isOpen() const { return format_ctx_ != nullptr; }
-    double getDuration() const;
-    double getCurrentTime() const;
+    [[nodiscard]] bool isPlaying() const { return playing_; }
+    [[nodiscard]] bool isOpen() const { return format_ctx_ != nullptr; }
+    [[nodiscard]] double getDuration() const;
+    [[nodiscard]] double getCurrentTime() const;
 
 private:
     struct Frame {

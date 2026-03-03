@@ -5,6 +5,19 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # Generate compile_commands.json for LSP
 
+# Enable strict warnings
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+# FFmpeg requires this macro for C++ compatibility
+add_definitions(-D__STDC_CONSTANT_MACROS)
+
+# Debug build: Enable sanitizers to catch real bugs
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address,undefined)
+    message(STATUS "Sanitizers enabled (AddressSanitizer + UndefinedBehaviorSanitizer)")
+endif()
+
 # Find required packages
 find_package(PkgConfig REQUIRED)
 

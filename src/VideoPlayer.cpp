@@ -1,29 +1,13 @@
 #include "VideoPlayer.h"
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 VideoPlayer::VideoPlayer()
-    : format_ctx_(nullptr),
-      video_codec_ctx_(nullptr),
-      audio_codec_ctx_(nullptr),
-      sws_ctx_(nullptr),
-      swr_ctx_(nullptr),
-      video_stream_index_(-1),
-      audio_stream_index_(-1),
-      window_(nullptr),
-      renderer_(nullptr),
-      texture_(nullptr),
-      audio_device_(0),
-      playing_(false),
-      quit_(false),
-      paused_(false),
-      current_time_(0.0),
-      video_clock_(0.0),
-      audio_clock_(0.0),
-      frame_timer_(0.0),
-      frame_last_pts_(0.0),
-      frame_last_delay_(0.0) {
-}
+    : format_ctx_(nullptr), video_codec_ctx_(nullptr), audio_codec_ctx_(nullptr), sws_ctx_(nullptr),
+      swr_ctx_(nullptr), video_stream_index_(-1), audio_stream_index_(-1), window_(nullptr),
+      renderer_(nullptr), texture_(nullptr), audio_device_(0), playing_(false), quit_(false),
+      paused_(false), current_time_(0.0), video_clock_(0.0), audio_clock_(0.0), frame_timer_(0.0),
+      frame_last_pts_(0.0), frame_last_delay_(0.0) {}
 
 VideoPlayer::~VideoPlayer() {
     stop();
@@ -46,7 +30,7 @@ bool VideoPlayer::open(const std::string& filename) {
         AVCodecParameters* codec_params = format_ctx_->streams[i]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(codec_params->codec_id);
 
-        if (!codec) {
+        if (codec == nullptr) {
             continue;
         }
 
@@ -82,7 +66,8 @@ bool VideoPlayer::open(const std::string& filename) {
 
     std::cout << "Video opened successfully:" << std::endl;
     std::cout << "  Duration: " << getDuration() << " seconds" << std::endl;
-    std::cout << "  Resolution: " << video_codec_ctx_->width << "x" << video_codec_ctx_->height << std::endl;
+    std::cout << "  Resolution: " << video_codec_ctx_->width << "x" << video_codec_ctx_->height
+              << std::endl;
     std::cout << "  Has audio: " << (audio_stream_index_ >= 0 ? "Yes" : "No") << std::endl;
 
     return true;
@@ -94,49 +79,38 @@ bool VideoPlayer::initSDL() {
         return false;
     }
 
-    window_ = SDL_CreateWindow(
-        "Simple Video Player",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
-        video_codec_ctx_->width,
-        video_codec_ctx_->height,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
-    );
+    window_ = SDL_CreateWindow("Simple Video Player", SDL_WINDOWPOS_CENTERED,
+                               SDL_WINDOWPOS_CENTERED, video_codec_ctx_->width,
+                               video_codec_ctx_->height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
     if (!window_) {
         std::cerr << "Failed to create window: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    // Raise window to foreground
+    SDL_RaiseWindow(window_);
+
+    renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_ACCELERATED);
     if (!renderer_) {
         std::cerr << "Failed to create renderer: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    texture_ = SDL_CreateTexture(
-        renderer_,
-        SDL_PIXELFORMAT_YV12,
-        SDL_TEXTUREACCESS_STREAMING,
-        video_codec_ctx_->width,
-        video_codec_ctx_->height
-    );
+    texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                 video_codec_ctx_->width, video_codec_ctx_->height);
 
     if (!texture_) {
         std::cerr << "Failed to create texture: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    sws_ctx_ = sws_getContext(
-        video_codec_ctx_->width,
-        video_codec_ctx_->height,
-        video_codec_ctx_->pix_fmt,
-        video_codec_ctx_->width,
-        video_codec_ctx_->height,
-        AV_PIX_FMT_YUV420P,
-        SWS_BILINEAR,
-        nullptr, nullptr, nullptr
-    );
+    SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
+
+    sws_ctx_ =
+        sws_getContext(video_codec_ctx_->width, video_codec_ctx_->height, video_codec_ctx_->pix_fmt,
+                       video_codec_ctx_->width, video_codec_ctx_->height, AV_PIX_FMT_BGRA,
+                       SWS_BILINEAR, nullptr, nullptr, nullptr);
 
     if (audio_stream_index_ >= 0) {
         SDL_AudioSpec wanted_spec, obtained_spec;
@@ -235,6 +209,7 @@ void VideoPlayer::stop() {
 void VideoPlayer::decodeThread() {
     AVPacket* packet = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
+    int64_t video_frame_count = 0;
 
     while (!quit_ && av_read_frame(format_ctx_, packet) >= 0) {
         if (packet->stream_index == video_stream_index_) {
@@ -245,10 +220,34 @@ void VideoPlayer::decodeThread() {
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
 
-                if (quit_) break;
+                if (quit_)
+                    break;
 
                 AVFrame* clone = av_frame_clone(frame);
-                double pts = frame->pts * av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
+
+                // Validate and calculate PTS with fallback
+                double pts;
+                if (frame->pts != AV_NOPTS_VALUE) {
+                    pts = frame->pts * av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
+                } else if (frame->pkt_dts != AV_NOPTS_VALUE) {
+                    pts = frame->pkt_dts *
+                          av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
+                    if (video_frame_count < 3) {
+                        std::cout << "Warning: Using DTS for frame " << video_frame_count
+                                  << std::endl;
+                    }
+                } else {
+                    // Generate PTS from frame count
+                    AVRational frame_rate =
+                        format_ctx_->streams[video_stream_index_]->avg_frame_rate;
+                    pts = video_frame_count * av_q2d(av_inv_q(frame_rate));
+                    if (video_frame_count < 3) {
+                        std::cout << "Warning: Generating PTS for frame " << video_frame_count
+                                  << ": " << pts << std::endl;
+                    }
+                }
+
+                video_frame_count++;
 
                 std::lock_guard<std::mutex> lock(video_mutex_);
                 video_queue_.push({clone, pts});
@@ -262,7 +261,8 @@ void VideoPlayer::decodeThread() {
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
 
-                if (quit_) break;
+                if (quit_)
+                    break;
 
                 AVFrame* clone = av_frame_clone(frame);
                 std::lock_guard<std::mutex> lock(audio_mutex_);
@@ -272,6 +272,61 @@ void VideoPlayer::decodeThread() {
         }
 
         av_packet_unref(packet);
+    }
+
+    // Flush video decoder
+    if (video_stream_index_ >= 0 && !quit_) {
+        std::cout << "Flushing video decoder..." << std::endl;
+        avcodec_send_packet(video_codec_ctx_, nullptr);
+
+        while (avcodec_receive_frame(video_codec_ctx_, frame) == 0 && !quit_) {
+            while (video_queue_.size() >= MAX_QUEUE_SIZE && !quit_) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+
+            if (quit_)
+                break;
+
+            AVFrame* clone = av_frame_clone(frame);
+
+            // Validate and calculate PTS with fallback
+            double pts;
+            if (frame->pts != AV_NOPTS_VALUE) {
+                pts = frame->pts * av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
+            } else if (frame->pkt_dts != AV_NOPTS_VALUE) {
+                pts = frame->pkt_dts * av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
+            } else {
+                AVRational frame_rate = format_ctx_->streams[video_stream_index_]->avg_frame_rate;
+                pts = video_frame_count * av_q2d(av_inv_q(frame_rate));
+            }
+
+            video_frame_count++;
+
+            std::lock_guard<std::mutex> lock(video_mutex_);
+            video_queue_.push({clone, pts});
+            video_cv_.notify_one();
+        }
+        std::cout << "Video decoder flushed. Total frames decoded: " << video_frame_count
+                  << std::endl;
+    }
+
+    // Flush audio decoder
+    if (audio_stream_index_ >= 0 && !quit_) {
+        avcodec_send_packet(audio_codec_ctx_, nullptr);
+
+        while (avcodec_receive_frame(audio_codec_ctx_, frame) == 0 && !quit_) {
+            while (audio_queue_.size() >= MAX_QUEUE_SIZE && !quit_) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+
+            if (quit_)
+                break;
+
+            AVFrame* clone = av_frame_clone(frame);
+            std::lock_guard<std::mutex> lock(audio_mutex_);
+            audio_queue_.push(clone);
+            audio_cv_.notify_one();
+        }
     }
 
     av_frame_free(&frame);
@@ -290,27 +345,52 @@ void VideoPlayer::videoRenderThread() {
         std::unique_lock<std::mutex> lock(video_mutex_);
         video_cv_.wait(lock, [this] { return !video_queue_.empty() || quit_; });
 
-        if (quit_) break;
+        if (quit_)
+            break;
 
         Frame frame_data = video_queue_.front();
         video_queue_.pop();
         lock.unlock();
 
-        AVFrame* yuv_frame = av_frame_alloc();
-        yuv_frame->format = AV_PIX_FMT_YUV420P;
-        yuv_frame->width = video_codec_ctx_->width;
-        yuv_frame->height = video_codec_ctx_->height;
-        av_frame_get_buffer(yuv_frame, 0);
+        AVFrame* bgra_frame = av_frame_alloc();
+        bgra_frame->format = AV_PIX_FMT_BGRA;
+        bgra_frame->width = video_codec_ctx_->width;
+        bgra_frame->height = video_codec_ctx_->height;
 
-        sws_scale(
-            sws_ctx_,
-            frame_data.frame->data,
-            frame_data.frame->linesize,
-            0,
-            video_codec_ctx_->height,
-            yuv_frame->data,
-            yuv_frame->linesize
-        );
+        // Allocate frame buffer with proper alignment (32 bytes for SIMD)
+        int ret = av_frame_get_buffer(bgra_frame, 32);
+        if (ret < 0) {
+            std::cerr << "Failed to allocate BGRA frame buffer: " << ret << std::endl;
+            av_frame_free(&bgra_frame);
+            av_frame_free(&frame_data.frame);
+            continue;
+        }
+
+        // Convert frame to BGRA format
+        int height_ret =
+            sws_scale(sws_ctx_, frame_data.frame->data, frame_data.frame->linesize, 0,
+                      video_codec_ctx_->height, bgra_frame->data, bgra_frame->linesize);
+
+        if (height_ret != video_codec_ctx_->height) {
+            std::cerr << "sws_scale failed: expected " << video_codec_ctx_->height << " but got "
+                      << height_ret << std::endl;
+            av_frame_free(&bgra_frame);
+            av_frame_free(&frame_data.frame);
+            continue;
+        }
+
+        if (!bgra_frame->data[0]) {
+            std::cerr << "Frame data is NULL after conversion" << std::endl;
+            av_frame_free(&bgra_frame);
+            av_frame_free(&frame_data.frame);
+            continue;
+        }
+
+        // Initialize timing for first frame
+        if (frame_last_pts_ == 0.0 && frame_last_delay_ == 0.0) {
+            frame_last_pts_ = frame_data.pts;
+            frame_last_delay_ = 1.0 / 25.0; // Default to 25fps
+        }
 
         double delay = frame_data.pts - frame_last_pts_;
         if (delay <= 0 || delay >= 1.0) {
@@ -340,19 +420,14 @@ void VideoPlayer::videoRenderThread() {
 
         current_time_ = frame_data.pts;
 
-        SDL_UpdateYUVTexture(
-            texture_,
-            nullptr,
-            yuv_frame->data[0], yuv_frame->linesize[0],
-            yuv_frame->data[1], yuv_frame->linesize[1],
-            yuv_frame->data[2], yuv_frame->linesize[2]
-        );
+        SDL_UpdateTexture(texture_, nullptr, bgra_frame->data[0], bgra_frame->linesize[0]);
 
+        SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
         SDL_RenderClear(renderer_);
         SDL_RenderCopy(renderer_, texture_, nullptr, nullptr);
         SDL_RenderPresent(renderer_);
 
-        av_frame_free(&yuv_frame);
+        av_frame_free(&bgra_frame);
         av_frame_free(&frame_data.frame);
     }
 }
@@ -374,14 +449,18 @@ void VideoPlayer::audioCallback(uint8_t* stream, int len) {
     AVFrame* frame = audio_queue_.front();
     audio_queue_.pop();
 
-    uint8_t* output = nullptr;
-    int out_samples = swr_convert(
-        swr_ctx_,
-        &output,
-        frame->nb_samples,
-        (const uint8_t**)frame->data,
-        frame->nb_samples
-    );
+    int out_buffer_size = av_samples_get_buffer_size(nullptr, audio_codec_ctx_->channels,
+                                                     frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+
+    uint8_t* output = (uint8_t*)av_malloc(out_buffer_size);
+    if (!output) {
+        av_frame_free(&frame);
+        return;
+    }
+
+    uint8_t* out_ptr = output;
+    int out_samples = swr_convert(swr_ctx_, &out_ptr, frame->nb_samples,
+                                  (const uint8_t**)frame->data, frame->nb_samples);
 
     if (out_samples > 0) {
         int data_size = out_samples * audio_codec_ctx_->channels * sizeof(int16_t);
@@ -392,6 +471,7 @@ void VideoPlayer::audioCallback(uint8_t* stream, int len) {
         audio_clock_ = pts;
     }
 
+    av_free(output);
     av_frame_free(&frame);
 }
 
@@ -452,6 +532,7 @@ void VideoPlayer::cleanupSDL() {
 
 void VideoPlayer::seek(double seconds) {
     // Simplified seek - would need more work for production use
-    int64_t timestamp = static_cast<int64_t>(seconds / av_q2d(format_ctx_->streams[video_stream_index_]->time_base));
+    int64_t timestamp = static_cast<int64_t>(
+        seconds / av_q2d(format_ctx_->streams[video_stream_index_]->time_base));
     av_seek_frame(format_ctx_, video_stream_index_, timestamp, AVSEEK_FLAG_BACKWARD);
 }
