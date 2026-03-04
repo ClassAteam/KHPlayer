@@ -1,44 +1,11 @@
-# Build directories
+# Helix will respect this file even without git
 build/
-cmake-build-*/
-src/compile_commands.json
-# Compiled binaries
 bin/
-*.exe
-*.out
-*.app
-
-# Object files
 *.o
-*.obj
-*.lo
-*.slo
-*.ko
-*.elf
-
-# Compiled libraries
 *.so
-*.so.*
-*.dylib
-*.dll
 *.a
-*.la
-*.lai
-*.lib
-
-# CMake
-build/
-
-# IDE specific
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Test videos (optional - uncomment if needed)
-# *.mp4
-# *.avi
-# *.mkv
-# *.mov
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+.helix/

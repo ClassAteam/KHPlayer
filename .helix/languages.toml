@@ -1,9 +1,0 @@
-[[language]]
-name = "cpp"
-language-servers = ["clangd"]
-auto-format = true
-formatter = { command = "clang-format", args = ["-style=file"] }
-
-[language-server.clangd]
-command = "clangd"
-args = ["--background-index", "--clang-tidy", "--completion-style=detailed", "--header-insertion=never"]
