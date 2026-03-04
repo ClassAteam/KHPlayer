@@ -1,4 +1,5 @@
 #include "VideoPlayer.h"
+#include "utility.h"
 #include <chrono>
 #include <iostream>
 
@@ -43,6 +44,9 @@ bool VideoPlayer::open(const std::string& filename) {
                 std::cerr << "Failed to open video codec" << std::endl;
                 return false;
             }
+
+            std::cout << "Successfully opened video codec: " << codec->name << " ("
+                      << codec->long_name << ")" << std::endl;
         } else if (codec_params->codec_type == AVMEDIA_TYPE_AUDIO && audio_stream_index_ < 0) {
             audio_stream_index_ = i;
             audio_codec_ctx_ = avcodec_alloc_context3(codec);
@@ -200,6 +204,11 @@ void VideoPlayer::stop() {
         audio_queue_.pop();
     }
 
+    while (!display_queue_.empty()) {
+        av_frame_free(&display_queue_.front());
+        display_queue_.pop();
+    }
+
     if (audio_device_ != 0) {
         SDL_CloseAudioDevice(audio_device_);
         audio_device_ = 0;
@@ -248,6 +257,9 @@ void VideoPlayer::decodeThread() {
                 }
 
                 video_frame_count++;
+                if (video_frame_count == 100) {
+                    frame_inspection(video_frame_count, clone);
+                }
 
                 std::lock_guard<std::mutex> lock(video_mutex_);
                 video_queue_.push({clone, pts});
@@ -420,16 +432,39 @@ void VideoPlayer::videoRenderThread() {
 
         current_time_ = frame_data.pts;
 
-        SDL_UpdateTexture(texture_, nullptr, bgra_frame->data[0], bgra_frame->linesize[0]);
+        static int bgra_frame_count = 0;
+        bgra_frame_count++;
+        if (bgra_frame_count == 100) {
+            bgra_frame_inspection(bgra_frame_count, bgra_frame);
+        }
 
-        SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
-        SDL_RenderClear(renderer_);
-        SDL_RenderCopy(renderer_, texture_, nullptr, nullptr);
-        SDL_RenderPresent(renderer_);
+        // Hand off to main thread for rendering
+        {
+            std::lock_guard<std::mutex> lock(display_mutex_);
+            display_queue_.push(bgra_frame);
+        }
 
-        av_frame_free(&bgra_frame);
         av_frame_free(&frame_data.frame);
     }
+}
+
+void VideoPlayer::renderFrame() {
+    AVFrame* bgra_frame = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(display_mutex_);
+        if (display_queue_.empty())
+            return;
+        bgra_frame = display_queue_.front();
+        display_queue_.pop();
+    }
+
+    SDL_UpdateTexture(texture_, nullptr, bgra_frame->data[0], bgra_frame->linesize[0]);
+    SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
+    SDL_RenderClear(renderer_);
+    SDL_RenderCopy(renderer_, texture_, nullptr, nullptr);
+    SDL_RenderPresent(renderer_);
+
+    av_frame_free(&bgra_frame);
 }
 
 void VideoPlayer::sdlAudioCallback(void* userdata, uint8_t* stream, int len) {

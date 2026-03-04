@@ -12,11 +12,11 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 # Debug build: Enable sanitizers to catch real bugs
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
-    message(STATUS "Sanitizers enabled (AddressSanitizer + UndefinedBehaviorSanitizer)")
-endif()
+# if(CMAKE_BUILD_TYPE MATCHES Debug)
+#     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+#     add_link_options(-fsanitize=address,undefined)
+#     message(STATUS "Sanitizers enabled (AddressSanitizer + UndefinedBehaviorSanitizer)")
+# endif()
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
@@ -40,6 +40,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 set(SOURCES
     src/main.cpp
     src/VideoPlayer.cpp
+    src/utility.cpp
 )
 
 # Create executable

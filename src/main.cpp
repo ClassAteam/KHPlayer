@@ -110,6 +110,7 @@ int main(int argc, char* argv[]) {
             running = false;
         }
 
+        player.renderFrame();
         SDL_Delay(10);
     }
 

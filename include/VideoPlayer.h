@@ -32,6 +32,7 @@ public:
     void togglePlayPause();
     void stop();
     void seek(double seconds);
+    void renderFrame();
 
     [[nodiscard]] bool isPlaying() const { return playing_; }
     [[nodiscard]] bool isOpen() const { return format_ctx_ != nullptr; }
@@ -78,8 +79,10 @@ private:
 
     std::queue<Frame> video_queue_;
     std::queue<AVFrame*> audio_queue_;
+    std::queue<AVFrame*> display_queue_;
     std::mutex video_mutex_;
     std::mutex audio_mutex_;
+    std::mutex display_mutex_;
     std::condition_variable video_cv_;
     std::condition_variable audio_cv_;
 

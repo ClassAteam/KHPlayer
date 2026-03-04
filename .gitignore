@@ -1,7 +1,7 @@
 # Build directories
 build/
 cmake-build-*/
-
+src/compile_commands.json
 # Compiled binaries
 bin/
 *.exe
@@ -27,12 +27,7 @@ bin/
 *.lib
 
 # CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
-!CMakeLists.txt
+build/
 
 # IDE specific
 .vscode/
