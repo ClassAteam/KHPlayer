@@ -9,3 +9,7 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 .helix/
+CMakeLists.txt.user
+CLAUDE.md
+build.sh
+run-in-gdb.sh
