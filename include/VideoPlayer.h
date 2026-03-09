@@ -2,6 +2,7 @@
 #include "Decoder.h"
 #include "Renderer.h"
 #include "SdlContext.h"
+#include <atomic>
 
 class VideoPlayer {
 public:
@@ -10,6 +11,8 @@ public:
     ~VideoPlayer();
 
 private:
+    std::atomic<bool> quit_{false};
+    std::atomic<bool> paused_{false};
     Decoder decoder_;
     SdlContext sdl_context_;
     Converter converter_;

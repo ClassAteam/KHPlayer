@@ -1,13 +1,21 @@
 #include "Renderer.h"
 #include "VideoContainer.h"
+#include <SDL_events.h>
+#include <SDL_keyboard.h>
+#include <SDL_keycode.h>
+#include <cmath>
 #include <iostream>
 #include <optional>
 #include <ostream>
+#include <thread>
+#include <chrono>
 extern "C" {
 #include <libavutil/time.h>
 }
 
-Renderer::Renderer(Converter& converter, SdlContext& sdl_context) : converter_(converter) {
+Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
+                   std::atomic<bool>& paused)
+    : converter_(converter), sdl_context_(sdl_context), quit_(quit), paused_(paused) {
 
     texture_ = sdl_context.getTexture();
     renderer_ = sdl_context.getRenderer();
@@ -17,7 +25,21 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context) : converter_(c
 
 void Renderer::renderFrame() {
     frame_timer_ = static_cast<double>(av_gettime()) / 1000000.0;
-    while (true) {
+    while (!quit_) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                quit_ = true;
+            } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
+                paused_ = !paused_;
+                sdl_context_.pauseAudio(paused_);
+            }
+        }
+
+        if (paused_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
 
         auto result = converter_.getImage();
         if (!result)
@@ -47,6 +69,16 @@ void Renderer::delay(double pts) {
 
     frame_last_delay_ = delay;
     frame_last_pts_ = pts;
+
+    double audio_clock = sdl_context_.getAudioClock();
+    double diff = pts - audio_clock;
+    double sync_threshold = (delay > 0.01) ? delay : 0.01;
+    if (fabs(diff) < 10.0) {
+        if (diff <= -sync_threshold)
+            delay = 0;
+        else if (diff >= sync_threshold)
+            delay = 2 * delay;
+    }
 
     frame_timer_ += delay;
     double actual_delay = frame_timer_ - (static_cast<double>(av_gettime()) / 1000000.0);

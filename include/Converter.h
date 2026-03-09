@@ -1,5 +1,6 @@
 #include "Decoder.h"
 #include "SdlContext.h"
+#include <atomic>
 #include <queue>
 extern "C" {
 #include <libavutil/frame.h>
@@ -14,7 +15,7 @@ struct BgraFrame {
 class Converter {
 public:
     Converter(Decoder& decoder, SdlContext& sdl_context);
-    void convert();
+    void convert(std::atomic<bool>& quit, std::atomic<bool>& paused);
     std::optional<BgraFrame> getImage();
 
 private:

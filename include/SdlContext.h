@@ -16,6 +16,9 @@ public:
     SwsContext* getScalerContext();
     SDL_Renderer* getRenderer();
     SDL_Texture* getTexture();
+    void pushAudioFrame(AVFrame* frame);
+    double getAudioClock() const;
+    void pauseAudio(bool paused);
 
 private:
     void initWindow(int widht, int height);

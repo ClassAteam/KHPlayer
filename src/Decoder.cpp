@@ -14,16 +14,16 @@ Decoder::Decoder(const std::string& filename) : container_(filename) {
     frame_ = av_frame_alloc();
 }
 
-void Decoder::decode() {
+void Decoder::decode(std::atomic<bool>& quit) {
     auto fmt_cntxt = container_.getFormatContext();
     int video_stream_index = container_.getVideoStreamIndex();
     int audio_stream_index = container_.getAudioStreamIndex();
 
-    while (av_read_frame(fmt_cntxt, packet_) >= 0) {
+    while (!quit && av_read_frame(fmt_cntxt, packet_) >= 0) {
         if (packet_->stream_index == video_stream_index) {
-            decodeVideoStream();
+            decodeVideoPacket();
         } else if (packet_->stream_index == audio_stream_index) {
-            decodeAudioStream();
+            decodeAudioPacket();
         }
 
         av_packet_unref(packet_);
@@ -32,7 +32,7 @@ void Decoder::decode() {
     decoding_complete_ = true;
 }
 
-void Decoder::decodeVideoStream() {
+void Decoder::decodeVideoPacket() {
     auto codec_ctxt = container_.getVideoCodecContext();
     auto time_base = container_.videoTimeBase();
     avcodec_send_packet(codec_ctxt, packet_);
@@ -68,7 +68,7 @@ void Decoder::decodeVideoStream() {
     }
 }
 
-void Decoder::decodeAudioStream() {
+void Decoder::decodeAudioPacket() {
     auto codec_ctxt = container_.getAudioCodecContext();
 
     avcodec_send_packet(codec_ctxt, packet_);
@@ -100,4 +100,16 @@ bool Decoder::isDecodingComplete() {
 }
 bool Decoder::isQueueEmpty() {
     return video_queue_.empty();
+}
+
+std::optional<AVFrame*> Decoder::getAudioFrame() {
+    if (audio_queue_.empty())
+        return std::nullopt;
+    AVFrame* frame = audio_queue_.front();
+    audio_queue_.pop();
+    return frame;
+}
+
+bool Decoder::isAudioQueueEmpty() {
+    return audio_queue_.empty();
 }

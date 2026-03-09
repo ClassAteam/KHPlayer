@@ -1,5 +1,6 @@
 #pragma once
 #include "VideoContainer.h"
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -11,16 +12,18 @@ struct Frame {
 class Decoder {
 public:
     Decoder(const std::string& filename);
-    void decode();
+    void decode(std::atomic<bool>& quit);
     void inspect_last_frame();
     std::optional<Frame> getFrame();
+    std::optional<AVFrame*> getAudioFrame();
     VideoContainer& getContainer();
     bool isDecodingComplete();
     bool isQueueEmpty();
+    bool isAudioQueueEmpty();
 
 private:
-    void decodeVideoStream();
-    void decodeAudioStream();
+    void decodeVideoPacket();
+    void decodeAudioPacket();
     VideoContainer container_;
 
     std::queue<Frame> video_queue_;

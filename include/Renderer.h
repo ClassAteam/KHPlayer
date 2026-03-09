@@ -1,10 +1,12 @@
 #include "Converter.h"
 #include <SDL_render.h>
 #include <SdlContext.h>
+#include <atomic>
 
 class Renderer {
 public:
-    Renderer(Converter& converter, SdlContext& sdl_context);
+    Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
+             std::atomic<bool>& paused);
     void renderFrame();
 
 private:
@@ -12,10 +14,11 @@ private:
     SDL_Texture* texture_;
     SDL_Renderer* renderer_;
     Converter& converter_;
+    SdlContext& sdl_context_;
+    std::atomic<bool>& quit_;
+    std::atomic<bool>& paused_;
 
     double frame_last_pts_;
     double frame_last_delay_;
-    double audio_clock_;
     double frame_timer_;
-    double current_time_;
 };

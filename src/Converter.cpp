@@ -1,6 +1,8 @@
 #include "Converter.h"
+#include <chrono>
 #include <iostream>
 #include <ostream>
+#include <thread>
 Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decoder) {
 
     frame_width_ = decoder.getContainer().getWidth();
@@ -8,9 +10,12 @@ Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decod
     scaler_ctx_ = sdl_context.getScalerContext();
 }
 
-void Converter::recieveImages() {
-    while (!decoder_.isDecodingComplete() || !decoder_.isQueueEmpty()) {
-
+void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& paused) {
+    while (!quit && (!decoder_.isDecodingComplete() || !decoder_.isQueueEmpty())) {
+        if (paused) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
         auto frame = decoder_.getFrame();
         if (!frame) {
             continue;

@@ -4,7 +4,7 @@ CompileFlags:
 
 Diagnostics:
   # Disable some overly aggressive warnings
-  UnusedIncludes: None
+  UnusedIncludes: Experiment
 
   # Clang-Tidy checks
   ClangTidy:

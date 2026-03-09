@@ -6,16 +6,30 @@
 #include <thread>
 
 VideoPlayer::VideoPlayer(const std::string& filename)
-    : decoder_(Decoder(filename)), sdl_context_(SdlContext(decoder_.getContainer())),
-      converter_(decoder_, sdl_context_), renderer_(converter_, sdl_context_) {}
+    : decoder_(filename), sdl_context_(decoder_.getContainer()),
+      converter_(decoder_, sdl_context_),
+      renderer_(converter_, sdl_context_, quit_, paused_) {}
 
 void VideoPlayer::test() {
-    std::thread decoding(&Decoder::decode, &decoder_);
-    std::thread receive(&Converter::convert, &converter_);
-    while (!decoder_.isDecodingComplete()) {
+    std::thread decoding([this]() { decoder_.decode(quit_); });
+    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+    std::thread audio_feed([this]() {
+        while (!quit_ && (!decoder_.isDecodingComplete() || !decoder_.isAudioQueueEmpty())) {
+            if (paused_) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            auto frame = decoder_.getAudioFrame();
+            if (frame)
+                sdl_context_.pushAudioFrame(*frame);
+        }
+    });
 
-        renderer_.renderFrame();
-    }
+    renderer_.renderFrame();
+
+    decoding.join();
+    receive.join();
+    audio_feed.join();
 }
 
 VideoPlayer::~VideoPlayer() {}

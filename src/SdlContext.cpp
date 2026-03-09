@@ -131,6 +131,11 @@ void SdlContext::initResamplerContext(int channels_layout, int sample_rate, AVSa
     swr_init(swr_ctx_);
 }
 
+void SdlContext::pushAudioFrame(AVFrame* frame) {
+    std::lock_guard<std::mutex> lock(audio_mutex_);
+    audio_queue_.push(frame);
+}
+
 SwsContext* SdlContext::getScalerContext() {
     return sws_ctx_;
 }
@@ -141,4 +146,12 @@ SDL_Renderer* SdlContext::getRenderer() {
 
 SDL_Texture* SdlContext::getTexture() {
     return texture_;
+}
+
+double SdlContext::getAudioClock() const {
+    return audio_clock_;
+}
+
+void SdlContext::pauseAudio(bool paused) {
+    SDL_PauseAudioDevice(audio_device_, paused ? 1 : 0);
 }
