@@ -33,6 +33,7 @@ set(SOURCES
     src/Decoder.cpp
     src/Renderer.cpp
     src/SdlContext.cpp
+    src/Converter.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

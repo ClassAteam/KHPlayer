@@ -1,6 +1,7 @@
 #pragma once
 #include "Decoder.h"
 #include "Renderer.h"
+#include "SdlContext.h"
 
 class VideoPlayer {
 public:
@@ -10,5 +11,7 @@ public:
 
 private:
     Decoder decoder_;
+    SdlContext sdl_context_;
+    Converter converter_;
     Renderer renderer_;
 };
