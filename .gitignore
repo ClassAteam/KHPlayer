@@ -1,6 +1,7 @@
 # Helix will respect this file even without git
 build/
 bin/
+third_party/
 *.o
 *.so
 *.a

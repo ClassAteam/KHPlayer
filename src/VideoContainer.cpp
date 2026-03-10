@@ -1,6 +1,11 @@
 #include "VideoContainer.h"
-#include <iostream>
-#include <ostream>
+#ifdef ANDROID
+#include <android/log.h>
+#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
+#else
+#include <cstdio>
+#define LOG(...) printf(__VA_ARGS__)
+#endif
 
 VideoContainer::VideoContainer(const std::string& filename) {
     openContainer(filename);
@@ -53,8 +58,7 @@ void VideoContainer::initVideoCodec(AVCodecParameters* codec_params, int index,
         throw std::runtime_error("Failed to open video codec");
     }
 
-    std::cout << "Successfully opened video codec: " << codec->name << " (" << codec->long_name
-              << ")" << std::endl;
+    LOG("Opened video codec: %s (%s)", codec->name, codec->long_name ? codec->long_name : "?");
 }
 
 void VideoContainer::initAudioCodec(AVCodecParameters* codec_params, int index,
@@ -68,8 +72,7 @@ void VideoContainer::initAudioCodec(AVCodecParameters* codec_params, int index,
         throw std::runtime_error("Failed to open audio codec");
     }
 
-    std::cout << "Successfully opened audio codec: " << codec->name << " (" << codec->long_name
-              << ")" << std::endl;
+    LOG("Opened audio codec: %s (%s)", codec->name, codec->long_name ? codec->long_name : "?");
 }
 double VideoContainer::getDuration() const {
     if (format_ctx_) {
@@ -90,7 +93,7 @@ AVPixelFormat VideoContainer::getPixelFromat() const {
 }
 
 int VideoContainer::getNumberOfChannels() const {
-    return audio_codec_ctx_->channels;
+    return audio_codec_ctx_->ch_layout.nb_channels;
 }
 double VideoContainer::audioTimeBase() const {
     double base = av_q2d(format_ctx_->streams[audio_stream_index_]->time_base);
@@ -101,7 +104,7 @@ double VideoContainer::videoTimeBase() const {
     return base;
 }
 int VideoContainer::channelLayout() const {
-    return audio_codec_ctx_->channel_layout;
+    return audio_codec_ctx_->ch_layout.u.mask;
 }
 int VideoContainer::sampleRate() const {
     return audio_codec_ctx_->sample_rate;

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder banner for Android TV (320x180dp). Replace with a real PNG. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#1A1A2E" />
+</shape>

@@ -2,6 +2,7 @@
 #include <string>
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 }
 
 class VideoContainer {
