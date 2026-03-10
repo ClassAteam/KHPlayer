@@ -6,8 +6,7 @@
 #include <thread>
 
 VideoPlayer::VideoPlayer(const std::string& filename)
-    : decoder_(filename), sdl_context_(decoder_.getContainer()),
-      converter_(decoder_, sdl_context_),
+    : decoder_(filename), sdl_context_(decoder_.getContainer()), converter_(decoder_, sdl_context_),
       renderer_(converter_, sdl_context_, quit_, paused_) {}
 
 void VideoPlayer::test() {

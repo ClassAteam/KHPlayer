@@ -47,3 +47,34 @@ target_link_libraries(${PROJECT_NAME}
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+
+add_executable(VideoServer src/server_main.cpp)
+
+target_link_libraries(VideoServer PkgConfig::LIBAV)
+
+set_target_properties(VideoServer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+set(CLIENT_SOURCES
+    src/client_main.cpp
+    src/VideoPlayer.cpp
+    src/utility.cpp
+    src/VideoContainer.cpp
+    src/Decoder.cpp
+    src/Renderer.cpp
+    src/SdlContext.cpp
+    src/Converter.cpp
+)
+
+add_executable(VideoClient ${CLIENT_SOURCES})
+
+target_link_libraries(VideoClient
+    PkgConfig::LIBAV
+    PkgConfig::SDL2
+    pthread
+)
+
+set_target_properties(VideoClient PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
