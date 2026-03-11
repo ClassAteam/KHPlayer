@@ -131,6 +131,11 @@ void SdlContext::pushAudioFrame(AVFrame* frame) {
     audio_queue_.push(frame);
 }
 
+size_t SdlContext::audioQueueSize() const {
+    std::lock_guard<std::mutex> lock(audio_mutex_);
+    return audio_queue_.size();
+}
+
 SwsContext* SdlContext::getScalerContext() {
     return sws_ctx_;
 }

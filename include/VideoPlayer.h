@@ -8,6 +8,7 @@ class VideoPlayer {
 public:
     VideoPlayer(const std::string& filename);
     void test();
+    void test_loop();
     ~VideoPlayer();
 
 private:

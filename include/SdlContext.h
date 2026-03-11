@@ -17,6 +17,7 @@ public:
     SDL_Renderer* getRenderer();
     SDL_Texture* getTexture();
     void pushAudioFrame(AVFrame* frame);
+    size_t audioQueueSize() const;
     double getAudioClock() const;
     void pauseAudio(bool paused);
 
@@ -37,7 +38,7 @@ private:
     SDL_Renderer* renderer_;
     SDL_Texture* texture_;
     SDL_AudioDeviceID audio_device_;
-    std::mutex audio_mutex_;
+    mutable std::mutex audio_mutex_;
     std::queue<AVFrame*> audio_queue_;
     int number_of_channels_;
     double time_base_;

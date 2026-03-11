@@ -12,7 +12,7 @@ struct Frame {
 class Decoder {
 public:
     Decoder(const std::string& filename);
-    void decode(std::atomic<bool>& quit);
+    void decode(std::atomic<bool>& quit, bool loop = false);
     void inspect_last_frame();
     std::optional<Frame> getFrame();
     std::optional<AVFrame*> getAudioFrame();

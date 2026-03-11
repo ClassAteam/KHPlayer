@@ -14,12 +14,22 @@ Decoder::Decoder(const std::string& filename) : container_(filename) {
     frame_ = av_frame_alloc();
 }
 
-void Decoder::decode(std::atomic<bool>& quit) {
+void Decoder::decode(std::atomic<bool>& quit, bool loop) {
     auto fmt_cntxt = container_.getFormatContext();
     int video_stream_index = container_.getVideoStreamIndex();
     int audio_stream_index = container_.getAudioStreamIndex();
 
-    while (!quit && av_read_frame(fmt_cntxt, packet_) >= 0) {
+    while (!quit) {
+        if (av_read_frame(fmt_cntxt, packet_) < 0) {
+            if (!loop)
+                break;
+            av_seek_frame(fmt_cntxt, -1, 0, AVSEEK_FLAG_BACKWARD);
+            avcodec_flush_buffers(container_.getVideoCodecContext());
+            avcodec_flush_buffers(container_.getAudioCodecContext());
+            video_frame_count_ = 0;
+            continue;
+        }
+
         if (packet_->stream_index == video_stream_index) {
             decodeVideoPacket();
         } else if (packet_->stream_index == audio_stream_index) {
@@ -73,6 +83,9 @@ void Decoder::decodeAudioPacket() {
 
     avcodec_send_packet(codec_ctxt, packet_);
     while (avcodec_receive_frame(codec_ctxt, frame_) == 0) {
+        while (audio_queue_.size() >= MAX_QUEUE_SIZE) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
         AVFrame* clone = av_frame_clone(frame_);
         audio_queue_.push(clone);
     }

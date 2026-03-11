@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     std::string video_file = argv[1];
 #endif
     VideoPlayer player(video_file);
-    player.test();
+    player.test_loop();
 
     return 0;
 }

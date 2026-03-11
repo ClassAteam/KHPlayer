@@ -18,6 +18,36 @@ void VideoPlayer::test() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
+            if (sdl_context_.audioQueueSize() >= 25) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            auto frame = decoder_.getAudioFrame();
+            if (frame)
+                sdl_context_.pushAudioFrame(*frame);
+        }
+    });
+
+    renderer_.renderFrame();
+
+    decoding.join();
+    receive.join();
+    audio_feed.join();
+}
+
+void VideoPlayer::test_loop() {
+    std::thread decoding([this]() { decoder_.decode(quit_, true); });
+    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+    std::thread audio_feed([this]() {
+        while (!quit_ && (!decoder_.isDecodingComplete() || !decoder_.isAudioQueueEmpty())) {
+            if (paused_) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            if (sdl_context_.audioQueueSize() >= 25) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
             auto frame = decoder_.getAudioFrame();
             if (frame)
                 sdl_context_.pushAudioFrame(*frame);

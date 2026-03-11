@@ -11,7 +11,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Connecting to " << url << std::endl;
 
     VideoPlayer player(url);
-    player.test();
+    // player.test();
+    player.test_loop();
 
     return 0;
 }
