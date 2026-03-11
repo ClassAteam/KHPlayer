@@ -61,6 +61,16 @@ else()
     set(FFMPEG_INCLUDE_DIR "${FFMPEG_PREFIX}/include")
     set(FFMPEG_LIB_DIR "${FFMPEG_PREFIX}/linux-x86_64")
 
+    option(TRACY_ENABLE "Enable Tracy profiler" ON)
+    include(FetchContent)
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.11.1
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(tracy)
+
     foreach(lib avcodec avformat avutil swscale swresample)
         add_library(${lib} SHARED IMPORTED)
         set_target_properties(${lib} PROPERTIES
@@ -79,6 +89,7 @@ else()
         avcodec avformat avutil swscale swresample
         PkgConfig::SDL2
         pthread
+        Tracy::TracyClient
     )
 
     set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -116,6 +127,7 @@ else()
         avcodec avformat avutil swscale swresample
         PkgConfig::SDL2
         pthread
+        Tracy::TracyClient
     )
 
     set_target_properties(VideoClient PROPERTIES

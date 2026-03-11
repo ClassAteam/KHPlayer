@@ -4,15 +4,17 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <tracy/Tracy.hpp>
 
 VideoPlayer::VideoPlayer(const std::string& filename)
     : decoder_(filename), sdl_context_(decoder_.getContainer()), converter_(decoder_, sdl_context_),
       renderer_(converter_, sdl_context_, quit_, paused_) {}
 
 void VideoPlayer::test() {
-    std::thread decoding([this]() { decoder_.decode(quit_); });
-    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+    std::thread decoding([this]() { tracy::SetThreadName("Decoder"); decoder_.decode(quit_); });
+    std::thread receive([this]() { tracy::SetThreadName("Converter"); converter_.convert(quit_, paused_); });
     std::thread audio_feed([this]() {
+        tracy::SetThreadName("AudioFeed");
         while (!quit_ && (!decoder_.isDecodingComplete() || !decoder_.isAudioQueueEmpty())) {
             if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -23,8 +25,10 @@ void VideoPlayer::test() {
                 continue;
             }
             auto frame = decoder_.getAudioFrame();
-            if (frame)
+            if (frame) {
+                ZoneScopedN("pushAudioFrame");
                 sdl_context_.pushAudioFrame(*frame);
+            }
         }
     });
 
@@ -36,9 +40,10 @@ void VideoPlayer::test() {
 }
 
 void VideoPlayer::test_loop() {
-    std::thread decoding([this]() { decoder_.decode(quit_, true); });
-    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+    std::thread decoding([this]() { tracy::SetThreadName("Decoder"); decoder_.decode(quit_, true); });
+    std::thread receive([this]() { tracy::SetThreadName("Converter"); converter_.convert(quit_, paused_); });
     std::thread audio_feed([this]() {
+        tracy::SetThreadName("AudioFeed");
         while (!quit_ && (!decoder_.isDecodingComplete() || !decoder_.isAudioQueueEmpty())) {
             if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -49,8 +54,10 @@ void VideoPlayer::test_loop() {
                 continue;
             }
             auto frame = decoder_.getAudioFrame();
-            if (frame)
+            if (frame) {
+                ZoneScopedN("pushAudioFrame");
                 sdl_context_.pushAudioFrame(*frame);
+            }
         }
     });
 

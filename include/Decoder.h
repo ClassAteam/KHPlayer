@@ -34,4 +34,5 @@ private:
 
     static const int MAX_QUEUE_SIZE = 25;
     bool decoding_complete_{false};
+    std::atomic<bool>* quit_{nullptr};
 };

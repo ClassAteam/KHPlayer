@@ -3,6 +3,7 @@
 #include <iostream>
 #include <ostream>
 #include <thread>
+#include <tracy/Tracy.hpp>
 Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decoder) {
 
     frame_width_ = decoder.getContainer().getWidth();
@@ -18,6 +19,7 @@ void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& paused) {
         }
         auto frame = decoder_.getFrame();
         if (!frame) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
         auto recieved_frame = &frame.value();
@@ -33,6 +35,7 @@ void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& paused) {
     }
 }
 std::optional<BgraFrame> Converter::convertFrame(Frame* frame) {
+    ZoneScoped;
 
     BgraFrame new_frame;
     new_frame.bgra = av_frame_alloc();

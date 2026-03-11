@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "VideoContainer.h"
+#include <tracy/Tracy.hpp>
 #include <SDL_events.h>
 #include <SDL_keyboard.h>
 #include <SDL_keycode.h>
@@ -24,11 +25,14 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bo
 }
 
 void Renderer::renderFrame() {
+    tracy::SetThreadName("Renderer");
     frame_timer_ = static_cast<double>(av_gettime()) / 1000000.0;
     while (!quit_) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
+                quit_ = true;
+            } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
                 quit_ = true;
             } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
                 paused_ = !paused_;
@@ -56,7 +60,8 @@ void Renderer::renderFrame() {
         if (SDL_RenderCopy(renderer_, texture_, nullptr, nullptr) < 0)
             std::cerr << "SDL_RenderCopy failed: " << SDL_GetError() << std::endl;
         SDL_RenderPresent(renderer_);
-        delay(image.pts);
+        FrameMarkNamed("render");
+        { ZoneScopedN("delay"); delay(image.pts); }
 
         av_frame_free(&image.bgra);
     }

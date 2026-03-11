@@ -7,6 +7,7 @@ extern "C" {
 }
 #include <ostream>
 #include <thread>
+#include <tracy/Tracy.hpp>
 
 Decoder::Decoder(const std::string& filename) : container_(filename) {
 
@@ -15,6 +16,7 @@ Decoder::Decoder(const std::string& filename) : container_(filename) {
 }
 
 void Decoder::decode(std::atomic<bool>& quit, bool loop) {
+    quit_ = &quit;
     auto fmt_cntxt = container_.getFormatContext();
     int video_stream_index = container_.getVideoStreamIndex();
     int audio_stream_index = container_.getAudioStreamIndex();
@@ -27,6 +29,7 @@ void Decoder::decode(std::atomic<bool>& quit, bool loop) {
             avcodec_flush_buffers(container_.getVideoCodecContext());
             avcodec_flush_buffers(container_.getAudioCodecContext());
             video_frame_count_ = 0;
+            FrameMark;
             continue;
         }
 
@@ -43,14 +46,16 @@ void Decoder::decode(std::atomic<bool>& quit, bool loop) {
 }
 
 void Decoder::decodeVideoPacket() {
+    ZoneScoped;
     auto codec_ctxt = container_.getVideoCodecContext();
     auto time_base = container_.videoTimeBase();
     avcodec_send_packet(codec_ctxt, packet_);
 
     while (avcodec_receive_frame(codec_ctxt, frame_) == 0) {
-        while (video_queue_.size() >= MAX_QUEUE_SIZE) {
+        while (video_queue_.size() >= MAX_QUEUE_SIZE && !*quit_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+        if (*quit_) break;
 
         AVFrame* clone = av_frame_clone(frame_);
 
@@ -79,13 +84,15 @@ void Decoder::decodeVideoPacket() {
 }
 
 void Decoder::decodeAudioPacket() {
+    ZoneScoped;
     auto codec_ctxt = container_.getAudioCodecContext();
 
     avcodec_send_packet(codec_ctxt, packet_);
     while (avcodec_receive_frame(codec_ctxt, frame_) == 0) {
-        while (audio_queue_.size() >= MAX_QUEUE_SIZE) {
+        while (audio_queue_.size() >= MAX_QUEUE_SIZE && !*quit_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+        if (*quit_) break;
         AVFrame* clone = av_frame_clone(frame_);
         audio_queue_.push(clone);
     }
