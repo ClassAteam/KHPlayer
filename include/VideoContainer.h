@@ -16,7 +16,7 @@ public:
     int getNumberOfChannels() const;
     double audioTimeBase() const;
     double videoTimeBase() const;
-    int channelLayout() const;
+    AVChannelLayout channelLayout() const;
     int sampleRate() const;
     AVSampleFormat sampleFormat() const;
     int getVideoStreamIndex() const;

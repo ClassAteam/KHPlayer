@@ -1,4 +1,5 @@
 #include "VideoContainer.h"
+#include <stdexcept>
 #ifdef ANDROID
 #include <android/log.h>
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
@@ -103,8 +104,8 @@ double VideoContainer::videoTimeBase() const {
     double base = av_q2d(format_ctx_->streams[video_stream_index_]->time_base);
     return base;
 }
-int VideoContainer::channelLayout() const {
-    return audio_codec_ctx_->ch_layout.u.mask;
+AVChannelLayout VideoContainer::channelLayout() const {
+    return audio_codec_ctx_->ch_layout;
 }
 int VideoContainer::sampleRate() const {
     return audio_codec_ctx_->sample_rate;

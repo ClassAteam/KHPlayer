@@ -9,7 +9,7 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 
-static int write_to_socket(void* opaque, uint8_t* buf, int buf_size) {
+static int write_to_socket(void* opaque, const uint8_t* buf, int buf_size) {
     int fd = *static_cast<int*>(opaque);
     ssize_t sent = 0;
     while (sent < buf_size) {

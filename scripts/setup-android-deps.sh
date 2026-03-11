@@ -104,6 +104,14 @@ SCRIPT
 
     cd "$ROOT"
     rm -rf "/tmp/ffmpeg-${FFMPEG_VERSION}"
+
+    echo "[FFmpeg] Copying .so files for Gradle packaging..."
+    JNILIBS_DIR="$FFMPEG_PREFIX/android-jni/$ABI"
+    mkdir -p "$JNILIBS_DIR"
+    for f in "$FFMPEG_ABI_DIR"/lib*.so; do
+        cp "$f" "$JNILIBS_DIR/"
+    done
+
     echo "[FFmpeg] Done."
 fi
 

@@ -40,7 +40,7 @@ android {
         main {
             java.srcDirs = ['src/main/java']
             // FFmpeg prebuilt .so files — AGP will package them into the APK
-            jniLibs.srcDirs = ["${rootDir}/../third_party/ffmpeg"]
+            jniLibs.srcDirs = ["${rootDir}/../third_party/ffmpeg/android-jni"]
         }
     }
 

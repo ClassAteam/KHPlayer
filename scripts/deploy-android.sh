@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+export JAVA_HOME="${JAVA_HOME:-/opt/android-studio/jbr}"
+export ANDROID_NDK="${ANDROID_NDK:-$HOME/Android/Sdk/ndk/29.0.14206865}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ANDROID_DIR="$ROOT/android"
 APK="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"

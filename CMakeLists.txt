@@ -57,36 +57,44 @@ if(ANDROID)
     )
 
 else()
+    set(FFMPEG_PREFIX "${CMAKE_SOURCE_DIR}/third_party/ffmpeg")
+    set(FFMPEG_INCLUDE_DIR "${FFMPEG_PREFIX}/include")
+    set(FFMPEG_LIB_DIR "${FFMPEG_PREFIX}/linux-x86_64")
+
+    foreach(lib avcodec avformat avutil swscale swresample)
+        add_library(${lib} SHARED IMPORTED)
+        set_target_properties(${lib} PROPERTIES
+            IMPORTED_LOCATION "${FFMPEG_LIB_DIR}/lib${lib}.so"
+        )
+    endforeach()
+
     find_package(PkgConfig REQUIRED)
-
-    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
-        libavcodec
-        libavformat
-        libavutil
-        libswscale
-        libswresample
-    )
-
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 
     add_executable(${PROJECT_NAME} ${PLAYER_SOURCES})
 
+    target_include_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIR})
+
     target_link_libraries(${PROJECT_NAME}
-        PkgConfig::LIBAV
+        avcodec avformat avutil swscale swresample
         PkgConfig::SDL2
         pthread
     )
 
     set_target_properties(${PROJECT_NAME} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+        BUILD_RPATH "${FFMPEG_LIB_DIR}"
     )
 
     add_executable(VideoServer src/server_main.cpp)
 
-    target_link_libraries(VideoServer PkgConfig::LIBAV)
+    target_include_directories(VideoServer PRIVATE ${FFMPEG_INCLUDE_DIR})
+
+    target_link_libraries(VideoServer avcodec avformat avutil swscale swresample)
 
     set_target_properties(VideoServer PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+        BUILD_RPATH "${FFMPEG_LIB_DIR}"
     )
 
     set(CLIENT_SOURCES
@@ -102,14 +110,17 @@ else()
 
     add_executable(VideoClient ${CLIENT_SOURCES})
 
+    target_include_directories(VideoClient PRIVATE ${FFMPEG_INCLUDE_DIR})
+
     target_link_libraries(VideoClient
-        PkgConfig::LIBAV
+        avcodec avformat avutil swscale swresample
         PkgConfig::SDL2
         pthread
     )
 
     set_target_properties(VideoClient PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+        BUILD_RPATH "${FFMPEG_LIB_DIR}"
     )
 
 endif()

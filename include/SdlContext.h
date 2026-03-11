@@ -28,7 +28,7 @@ private:
     void initAudioDevice(int sample_rate, int channels);
     static void sdlAudioCallback(void* userdata, uint8_t* stream, int len);
     void audioCallback(uint8_t* stream, int len);
-    void initResamplerContext(int channels_layout, int sample_rate, AVSampleFormat fmt);
+    void initResamplerContext(AVChannelLayout ch_layout, int sample_rate, AVSampleFormat fmt);
 
     SwsContext* sws_ctx_;
     SwrContext* swr_ctx_;

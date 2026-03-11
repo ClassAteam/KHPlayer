@@ -119,15 +119,10 @@ void SdlContext::initAudioDevice(int sample_rate, int num_of_channels) {
     SDL_PauseAudioDevice(audio_device_, 0);
 }
 
-void SdlContext::initResamplerContext(int channels_layout, int sample_rate, AVSampleFormat fmt) {
+void SdlContext::initResamplerContext(AVChannelLayout ch_layout, int sample_rate, AVSampleFormat fmt) {
 
-    swr_ctx_ = swr_alloc();
-    av_opt_set_int(swr_ctx_, "in_channel_layout", channels_layout, 0);
-    av_opt_set_int(swr_ctx_, "out_channel_layout", channels_layout, 0);
-    av_opt_set_int(swr_ctx_, "in_sample_rate", sample_rate, 0);
-    av_opt_set_int(swr_ctx_, "out_sample_rate", sample_rate, 0);
-    av_opt_set_sample_fmt(swr_ctx_, "in_sample_fmt", fmt, 0);
-    av_opt_set_sample_fmt(swr_ctx_, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);
+    swr_alloc_set_opts2(&swr_ctx_, &ch_layout, AV_SAMPLE_FMT_S16, sample_rate,
+                        &ch_layout, fmt, sample_rate, 0, nullptr);
     swr_init(swr_ctx_);
 }
 
