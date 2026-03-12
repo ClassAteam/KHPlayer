@@ -61,7 +61,7 @@ else()
     set(FFMPEG_INCLUDE_DIR "${FFMPEG_PREFIX}/include")
     set(FFMPEG_LIB_DIR "${FFMPEG_PREFIX}/linux-x86_64")
 
-    option(TRACY_ENABLE "Enable Tracy profiler" ON)
+    option(TRACY_ENABLE "Enable Tracy profiler" OFF)
     include(FetchContent)
     FetchContent_Declare(
         tracy
@@ -70,6 +70,12 @@ else()
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(tracy)
+
+    option(TRACY_PROFILER "Build Tracy profiler GUI" OFF)
+    if(TRACY_PROFILER)
+        set(LEGACY ON CACHE BOOL "" FORCE)
+        add_subdirectory(${tracy_SOURCE_DIR}/profiler ${CMAKE_BINARY_DIR}/tracy-profiler)
+    endif()
 
     foreach(lib avcodec avformat avutil swscale swresample)
         add_library(${lib} SHARED IMPORTED)

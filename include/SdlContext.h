@@ -1,4 +1,5 @@
 #pragma once
+#include "BoundedQueue.h"
 #include "VideoContainer.h"
 #include <SDL_audio.h>
 #include <SDL_render.h>
@@ -7,17 +8,16 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
-#include <mutex>
-#include <queue>
+#include <atomic>
 
 class SdlContext {
 public:
     SdlContext(const VideoContainer& container);
+    ~SdlContext();
     SwsContext* getScalerContext();
     SDL_Renderer* getRenderer();
     SDL_Texture* getTexture();
     void pushAudioFrame(AVFrame* frame);
-    size_t audioQueueSize() const;
     double getAudioClock() const;
     void pauseAudio(bool paused);
 
@@ -38,9 +38,8 @@ private:
     SDL_Renderer* renderer_;
     SDL_Texture* texture_;
     SDL_AudioDeviceID audio_device_;
-    mutable std::mutex audio_mutex_;
-    std::queue<AVFrame*> audio_queue_;
+    BoundedQueue<AVFrame*> audio_queue_{25};
     int number_of_channels_;
     double time_base_;
-    double audio_clock_;
+    std::atomic<double> audio_clock_{0.0};
 };

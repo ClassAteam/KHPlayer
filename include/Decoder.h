@@ -1,9 +1,8 @@
 #pragma once
+#include "BoundedQueue.h"
 #include "VideoContainer.h"
 #include <atomic>
-#include <mutex>
 #include <optional>
-#include <queue>
 
 struct Frame {
     AVFrame* frame;
@@ -20,19 +19,20 @@ public:
     bool isDecodingComplete();
     bool isQueueEmpty();
     bool isAudioQueueEmpty();
+    void closeQueues();
 
 private:
     void decodeVideoPacket();
     void decodeAudioPacket();
     VideoContainer container_;
 
-    std::queue<Frame> video_queue_;
-    std::queue<AVFrame*> audio_queue_;
+    static const int MAX_QUEUE_SIZE = 25;
+    BoundedQueue<Frame> video_queue_{MAX_QUEUE_SIZE};
+    BoundedQueue<AVFrame*> audio_queue_{MAX_QUEUE_SIZE};
     AVPacket* packet_;
     AVFrame* frame_;
     int64_t video_frame_count_{0};
 
-    static const int MAX_QUEUE_SIZE = 25;
-    bool decoding_complete_{false};
+    std::atomic<bool> decoding_complete_{false};
     std::atomic<bool>* quit_{nullptr};
 };

@@ -1,6 +1,9 @@
 #include "Renderer.h"
 #include "VideoContainer.h"
+#ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
+#endif
+#include <algorithm>
 #include <SDL_events.h>
 #include <SDL_keyboard.h>
 #include <SDL_keycode.h>
@@ -25,14 +28,12 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bo
 }
 
 void Renderer::renderFrame() {
-    tracy::SetThreadName("Renderer");
     frame_timer_ = static_cast<double>(av_gettime()) / 1000000.0;
     while (!quit_) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                quit_ = true;
-            } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+            if (event.type == SDL_QUIT ||
+                (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
                 quit_ = true;
             } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
                 paused_ = !paused_;
@@ -60,8 +61,7 @@ void Renderer::renderFrame() {
         if (SDL_RenderCopy(renderer_, texture_, nullptr, nullptr) < 0)
             std::cerr << "SDL_RenderCopy failed: " << SDL_GetError() << std::endl;
         SDL_RenderPresent(renderer_);
-        FrameMarkNamed("render");
-        { ZoneScopedN("delay"); delay(image.pts); }
+        delay(image.pts);
 
         av_frame_free(&image.bgra);
     }
@@ -77,12 +77,11 @@ void Renderer::delay(double pts) {
 
     double audio_clock = sdl_context_.getAudioClock();
     double diff = pts - audio_clock;
-    double sync_threshold = (delay > 0.01) ? delay : 0.01;
-    if (fabs(diff) < 10.0) {
-        if (diff <= -sync_threshold)
-            delay = 0;
-        else if (diff >= sync_threshold)
-            delay = 2 * delay;
+    double sync_threshold = std::max(delay, 0.01);
+    if (fabs(diff) < 10.0 && fabs(diff) > sync_threshold) {
+        double max_step = delay * 0.5;
+        double correction = std::max(-max_step, std::min(max_step, diff));
+        delay = std::max(0.0, delay + correction);
     }
 
     frame_timer_ += delay;

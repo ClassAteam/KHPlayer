@@ -1,9 +1,9 @@
 #include "Converter.h"
-#include <chrono>
 #include <iostream>
 #include <ostream>
-#include <thread>
+#ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
+#endif
 Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decoder) {
 
     frame_width_ = decoder.getContainer().getWidth();
@@ -11,32 +11,30 @@ Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decod
     scaler_ctx_ = sdl_context.getScalerContext();
 }
 
-void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& paused) {
-    while (!quit && (!decoder_.isDecodingComplete() || !decoder_.isQueueEmpty())) {
-        if (paused) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            continue;
-        }
-        auto frame = decoder_.getFrame();
-        if (!frame) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
+void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& /*paused*/) {
+    while (!quit) {
+        auto frame = decoder_.getFrame();  // blocks until frame available or queue closed
+        if (!frame) break;                 // nullopt = decoder done, exit loop
+
         auto recieved_frame = &frame.value();
 
         auto bgra_frame = convertFrame(recieved_frame);
 
-        if (!bgra_frame)
+        if (!bgra_frame) {
+            av_frame_free(&recieved_frame->frame);
             continue;
+        }
 
-        display_queue_.push(bgra_frame.value());
+        if (!display_queue_.push(bgra_frame.value())) {
+            av_frame_free(&bgra_frame->bgra);
+            av_frame_free(&recieved_frame->frame);
+            break;
+        }
         av_frame_free(&recieved_frame->frame);
         bgra_frame_count_++;
     }
 }
 std::optional<BgraFrame> Converter::convertFrame(Frame* frame) {
-    ZoneScoped;
-
     BgraFrame new_frame;
     new_frame.bgra = av_frame_alloc();
     new_frame.bgra->format = AV_PIX_FMT_BGRA;
@@ -70,9 +68,9 @@ std::optional<BgraFrame> Converter::convertFrame(Frame* frame) {
 }
 
 std::optional<BgraFrame> Converter::getImage() {
-    if (display_queue_.empty())
-        return std::nullopt;
-    auto image = display_queue_.front();
-    display_queue_.pop();
-    return image;
+    return display_queue_.try_pop();
+}
+
+void Converter::close() {
+    display_queue_.close();
 }

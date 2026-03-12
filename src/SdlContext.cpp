@@ -5,7 +5,6 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 #include <libavutil/samplefmt.h>
 }
-#include <mutex>
 #include <stdexcept>
 
 SdlContext::SdlContext(const VideoContainer& container)
@@ -27,6 +26,11 @@ SdlContext::SdlContext(const VideoContainer& container)
     time_base_ = container.audioTimeBase();
     initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
                          container.sampleFormat());
+}
+
+SdlContext::~SdlContext() {
+    SDL_PauseAudioDevice(audio_device_, 1);
+    SDL_CloseAudioDevice(audio_device_);
 }
 
 void SdlContext::initWindow(int width, int height) {
@@ -68,14 +72,10 @@ void SdlContext::sdlAudioCallback(void* userdata, uint8_t* stream, int len) {
 void SdlContext::audioCallback(uint8_t* stream, int len) {
     SDL_memset(stream, 0, len);
 
-    std::lock_guard<std::mutex> lock(audio_mutex_);
+    auto frame_opt = audio_queue_.try_pop();
+    if (!frame_opt) return;
 
-    if (audio_queue_.empty()) {
-        return;
-    }
-
-    AVFrame* frame = audio_queue_.front();
-    audio_queue_.pop();
+    AVFrame* frame = *frame_opt;
 
     int out_buffer_size = av_samples_get_buffer_size(nullptr, number_of_channels_,
                                                      frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
@@ -96,7 +96,7 @@ void SdlContext::audioCallback(uint8_t* stream, int len) {
         SDL_MixAudioFormat(stream, output, AUDIO_S16SYS, copy_size, SDL_MIX_MAXVOLUME);
 
         double pts = frame->pts * time_base_;
-        audio_clock_ = pts;
+        audio_clock_.store(pts);
     }
 
     av_free(output);
@@ -127,13 +127,7 @@ void SdlContext::initResamplerContext(AVChannelLayout ch_layout, int sample_rate
 }
 
 void SdlContext::pushAudioFrame(AVFrame* frame) {
-    std::lock_guard<std::mutex> lock(audio_mutex_);
     audio_queue_.push(frame);
-}
-
-size_t SdlContext::audioQueueSize() const {
-    std::lock_guard<std::mutex> lock(audio_mutex_);
-    return audio_queue_.size();
 }
 
 SwsContext* SdlContext::getScalerContext() {
@@ -149,7 +143,7 @@ SDL_Texture* SdlContext::getTexture() {
 }
 
 double SdlContext::getAudioClock() const {
-    return audio_clock_;
+    return audio_clock_.load();
 }
 
 void SdlContext::pauseAudio(bool paused) {
