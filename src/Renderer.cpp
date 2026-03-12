@@ -3,16 +3,16 @@
 #ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
 #endif
-#include <algorithm>
 #include <SDL_events.h>
 #include <SDL_keyboard.h>
 #include <SDL_keycode.h>
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <optional>
 #include <ostream>
 #include <thread>
-#include <chrono>
 extern "C" {
 #include <libavutil/time.h>
 }
@@ -30,6 +30,7 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bo
 void Renderer::renderFrame() {
     frame_timer_ = static_cast<double>(av_gettime()) / 1000000.0;
     while (!quit_) {
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT ||

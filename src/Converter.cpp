@@ -13,25 +13,29 @@ Converter::Converter(Decoder& decoder, SdlContext& sdl_context) : decoder_(decod
 
 void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& /*paused*/) {
     while (!quit) {
-        auto frame = decoder_.getFrame();  // blocks until frame available or queue closed
-        if (!frame) break;                 // nullopt = decoder done, exit loop
 
-        auto recieved_frame = &frame.value();
+        {
+            auto frame = decoder_.getFrame();
+            if (!frame)
+                break;
 
-        auto bgra_frame = convertFrame(recieved_frame);
+            auto recieved_frame = &frame.value();
 
-        if (!bgra_frame) {
+            auto bgra_frame = convertFrame(recieved_frame);
+
+            if (!bgra_frame) {
+                av_frame_free(&recieved_frame->frame);
+                continue;
+            }
+
+            if (!display_queue_.push(bgra_frame.value())) {
+                av_frame_free(&bgra_frame->bgra);
+                av_frame_free(&recieved_frame->frame);
+                break;
+            }
             av_frame_free(&recieved_frame->frame);
-            continue;
+            bgra_frame_count_++;
         }
-
-        if (!display_queue_.push(bgra_frame.value())) {
-            av_frame_free(&bgra_frame->bgra);
-            av_frame_free(&recieved_frame->frame);
-            break;
-        }
-        av_frame_free(&recieved_frame->frame);
-        bgra_frame_count_++;
     }
 }
 std::optional<BgraFrame> Converter::convertFrame(Frame* frame) {

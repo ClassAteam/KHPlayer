@@ -2,6 +2,10 @@ CompileFlags:
   # Use compile_commands.json from build directory
   CompilationDatabase: build
 
+Index:
+  # Don't index CMake build dirs — they contain downloaded deps (Tracy, imgui, capstone, ...)
+  PathExclude: ["build/.*", "build-.*/.*", "third_party/.*"]
+
 Diagnostics:
   # Disable some overly aggressive warnings
   UnusedIncludes: Experiment

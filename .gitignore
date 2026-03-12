@@ -16,3 +16,4 @@ run-in-gdb.sh
 build-tsan/
 build-prof/
 perf.data*
+build-tracy/

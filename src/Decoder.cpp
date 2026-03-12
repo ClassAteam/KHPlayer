@@ -24,6 +24,7 @@ void Decoder::decode(std::atomic<bool>& quit, bool loop) {
     int audio_stream_index = container_.getAudioStreamIndex();
 
     while (!quit) {
+
         if (av_read_frame(fmt_cntxt, packet_) < 0) {
             if (!loop)
                 break;
@@ -54,25 +55,24 @@ void Decoder::decodeVideoPacket() {
     avcodec_send_packet(codec_ctxt, packet_);
 
     while (avcodec_receive_frame(codec_ctxt, frame_) == 0) {
+
         double pts;
-        {
-            if (frame_->pts != AV_NOPTS_VALUE) {
-                pts = frame_->pts * time_base;
-            } else if (frame_->pkt_dts != AV_NOPTS_VALUE) {
-                pts = frame_->pkt_dts * time_base;
-                if (video_frame_count_ < 3) {
-                    std::cout << "Warning: Using DTS for frame " << video_frame_count_ << std::endl;
-                }
-            } else {
-                AVRational frame_rate = container_.averageFrameRate();
-                pts = video_frame_count_ * av_q2d(av_inv_q(frame_rate));
-                if (video_frame_count_ < 3) {
-                    std::cout << "Warning: Generating PTS for frame " << video_frame_count_ << ": "
-                              << pts << std::endl;
-                }
+        if (frame_->pts != AV_NOPTS_VALUE) {
+            pts = frame_->pts * time_base;
+        } else if (frame_->pkt_dts != AV_NOPTS_VALUE) {
+            pts = frame_->pkt_dts * time_base;
+            if (video_frame_count_ < 3) {
+                std::cout << "Warning: Using DTS for frame " << video_frame_count_ << std::endl;
             }
-            video_frame_count_++;
+        } else {
+            AVRational frame_rate = container_.averageFrameRate();
+            pts = video_frame_count_ * av_q2d(av_inv_q(frame_rate));
+            if (video_frame_count_ < 3) {
+                std::cout << "Warning: Generating PTS for frame " << video_frame_count_ << ": "
+                          << pts << std::endl;
+            }
         }
+        video_frame_count_++;
 
         AVFrame* clone = av_frame_clone(frame_);
         if (!video_queue_.push({clone, pts})) {

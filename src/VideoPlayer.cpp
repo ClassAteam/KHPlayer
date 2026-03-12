@@ -13,9 +13,22 @@ VideoPlayer::VideoPlayer(const std::string& filename)
       renderer_(converter_, sdl_context_, quit_, paused_) {}
 
 void VideoPlayer::test() {
-    std::thread decoding([this]() { decoder_.decode(quit_); });
-    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+    std::thread decoding([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("Decoder");
+#endif
+        decoder_.decode(quit_);
+    });
+    std::thread receive([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("Converter");
+#endif
+        converter_.convert(quit_, paused_);
+    });
     std::thread audio_feed([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("AudioFeed");
+#endif
         while (!quit_) {
             if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -39,23 +52,39 @@ void VideoPlayer::test() {
 }
 
 void VideoPlayer::test_loop() {
-    std::thread decoding([this]() { decoder_.decode(quit_, true); });
-    std::thread receive([this]() { converter_.convert(quit_, paused_); });
+
+    std::thread decoding([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("Decoder");
+#endif
+        decoder_.decode(quit_, true);
+    });
+
+    std::thread receive([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("Converter");
+#endif
+        converter_.convert(quit_, paused_);
+    });
+
     std::thread audio_feed([this]() {
+#ifdef TRACY_ENABLE
+        tracy::SetThreadName("AudioFeed");
+#endif
         while (!quit_) {
+
             if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
-            auto frame = decoder_.getAudioFrame(); // blocks until frame or closed
+            auto frame = decoder_.getAudioFrame();
             if (!frame)
-                break; // nullopt = decoder done
+                break;
             sdl_context_.pushAudioFrame(*frame);
         }
     });
 
     renderer_.renderFrame();
-    // quit_ is now true; unblock threads that may be blocked on full queues
     decoder_.closeQueues();
     converter_.close();
 
