@@ -15,6 +15,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 set(PLAYER_SOURCES
     src/main.cpp
+    src/FileMenu.cpp
     src/VideoPlayer.cpp
     src/utility.cpp
     src/VideoContainer.cpp

@@ -92,7 +92,7 @@ cd "/tmp/ffmpeg-${FFMPEG_VERSION}"
     --disable-doc \\
     --disable-avdevice \\
     --disable-postproc \\
-    --disable-network \\
+    --enable-network \\
     --disable-stripping \\
     --enable-small
 make -j\$(nproc)
