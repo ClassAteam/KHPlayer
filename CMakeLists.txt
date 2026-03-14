@@ -63,6 +63,8 @@ if(ANDROID)
         android/app/src/main/cpp/android_client.cpp
         android/app/src/main/cpp/ConnectConfig.cpp
         android/app/src/main/cpp/FileMenu.cpp
+        android/app/src/main/cpp/Selector.cpp
+        android/app/src/main/cpp/TextRenderer.cpp
     )
     target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/android/app/src/main/cpp)
     target_link_libraries(SimpleVideoPlayer player SDL2 log)
