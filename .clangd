@@ -1,10 +1,17 @@
+If:
+  PathMatch: "android/.*"
+Diagnostics:
+  Suppress: "*"
+
+---
+
 CompileFlags:
   # Use compile_commands.json from build directory
   CompilationDatabase: build
 
 Index:
-  # Don't index CMake build dirs — they contain downloaded deps (Tracy, imgui, capstone, ...)
-  PathExclude: ["build/.*", "build-.*/.*", "third_party/.*"]
+  # Don't index CMake build dirs or Android-specific code (cross-compiled, host LSP can't handle it)
+  PathExclude: ["build/.*", "build-.*/.*", "third_party/.*", "android/.*"]
 
 Diagnostics:
   # Disable some overly aggressive warnings

@@ -11,9 +11,6 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
-# FileMenu.h lives here (Android-only UI, not part of the player module)
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
 # ── Platform dependency setup ─────────────────────────────────────────────────
 if(ANDROID)
     set(FFMPEG_INCLUDE_DIR "" CACHE PATH "Path to FFmpeg headers for Android")
@@ -64,9 +61,10 @@ add_subdirectory(player)
 if(ANDROID)
     add_library(SimpleVideoPlayer SHARED
         android/app/src/main/cpp/android_client.cpp
-        src/FileMenu.cpp
+        android/app/src/main/cpp/ConnectConfig.cpp
+        android/app/src/main/cpp/FileMenu.cpp
     )
-    target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR})
+    target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/android/app/src/main/cpp)
     target_link_libraries(SimpleVideoPlayer player SDL2 log)
 
 else()
