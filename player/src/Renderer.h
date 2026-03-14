@@ -1,3 +1,4 @@
+#pragma once
 #include "Converter.h"
 #include <SDL_render.h>
 #include <SdlContext.h>

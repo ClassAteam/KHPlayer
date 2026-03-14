@@ -17,7 +17,8 @@ static const std::vector<std::string> SUPPORTED_EXTS = {".mp4", ".mkv", ".avi", 
 
 static bool has_video_extension(const std::string& name) {
     for (const auto& ext : SUPPORTED_EXTS) {
-        if (name.size() >= ext.size() && name.compare(name.size() - ext.size(), ext.size(), ext) == 0)
+        if (name.size() >= ext.size() &&
+            name.compare(name.size() - ext.size(), ext.size(), ext) == 0)
             return true;
     }
     return false;
@@ -86,7 +87,8 @@ static void handle_stream(int client_fd, const std::string& filepath) {
         std::cerr << "Failed to open: " << filepath << std::endl;
         return;
     }
-    avformat_find_stream_info(in_ctx, nullptr);
+    if (avformat_find_stream_info(in_ctx, nullptr) < 0)
+        return;
 
     AVFormatContext* out_ctx = nullptr;
     avformat_alloc_output_context2(&out_ctx, nullptr, "mpegts", nullptr);
@@ -99,12 +101,13 @@ static void handle_stream(int client_fd, const std::string& filepath) {
 
     const int avio_buf_size = 65536;
     uint8_t* avio_buf = static_cast<uint8_t*>(av_malloc(avio_buf_size));
-    AVIOContext* avio_ctx =
-        avio_alloc_context(avio_buf, avio_buf_size, 1, &client_fd, nullptr, write_to_socket, nullptr);
+    AVIOContext* avio_ctx = avio_alloc_context(avio_buf, avio_buf_size, 1, &client_fd, nullptr,
+                                               write_to_socket, nullptr);
     out_ctx->pb = avio_ctx;
     out_ctx->flags |= AVFMT_FLAG_CUSTOM_IO;
 
-    avformat_write_header(out_ctx, nullptr);
+    if (avformat_write_header(out_ctx, nullptr) < 0)
+        return;
 
     AVPacket* pkt = av_packet_alloc();
     while (av_read_frame(in_ctx, pkt) >= 0) {
@@ -162,8 +165,14 @@ int main(int argc, char* argv[]) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(port);
-    bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-    listen(server_fd, 5);
+    if (bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        std::cerr << "bind failed" << std::endl;
+        return 1;
+    }
+    if (listen(server_fd, 5) < 0) {
+        std::cerr << "listen failed" << std::endl;
+        return 1;
+    }
 
     std::cout << "VideoServer listening on port " << port << ", serving: " << dir << std::endl;
 
@@ -188,7 +197,8 @@ int main(int argc, char* argv[]) {
             handle_files(client_fd, scan_directory(dir));
         } else if (method == "GET" && path.find("/stream?file=") == 0) {
             std::string filename = path.substr(13); // len("/stream?file=") == 13
-            if (filename.find('/') != std::string::npos || filename.find("..") != std::string::npos) {
+            if (filename.find('/') != std::string::npos ||
+                filename.find("..") != std::string::npos) {
                 handle_not_found(client_fd);
             } else {
                 handle_stream(client_fd, dir + filename);

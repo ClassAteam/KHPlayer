@@ -1,3 +1,4 @@
+#pragma once
 #include "BoundedQueue.h"
 #include "Decoder.h"
 #include "SdlContext.h"

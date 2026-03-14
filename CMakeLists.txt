@@ -11,51 +11,17 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
+# FileMenu.h lives here (Android-only UI, not part of the player module)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-set(PLAYER_SOURCES
-    src/main.cpp
-    src/FileMenu.cpp
-    src/VideoPlayer.cpp
-    src/utility.cpp
-    src/VideoContainer.cpp
-    src/Decoder.cpp
-    src/Renderer.cpp
-    src/SdlContext.cpp
-    src/Converter.cpp
-)
-
+# ── Platform dependency setup ─────────────────────────────────────────────────
 if(ANDROID)
-    # Paths to prebuilt FFmpeg for Android (e.g. from ffmpeg-kit)
-    # Pass these when configuring:
-    #   -DFFMPEG_INCLUDE_DIR=/path/to/ffmpeg/include
-    #   -DFFMPEG_LIB_DIR=/path/to/ffmpeg/lib
     set(FFMPEG_INCLUDE_DIR "" CACHE PATH "Path to FFmpeg headers for Android")
     set(FFMPEG_LIB_DIR     "" CACHE PATH "Path to FFmpeg prebuilt .so libs for Android")
-
-    # Path to SDL2 source (SDL2 must be built alongside via NDK)
-    # Pass: -DSDL2_ANDROID_DIR=/path/to/SDL2
-    set(SDL2_ANDROID_DIR "" CACHE PATH "Path to SDL2 source for Android")
-
-    foreach(lib avcodec avformat avutil swscale swresample)
-        add_library(${lib} SHARED IMPORTED)
-        set_target_properties(${lib} PROPERTIES
-            IMPORTED_LOCATION ${FFMPEG_LIB_DIR}/lib${lib}.so
-        )
-    endforeach()
+    set(SDL2_ANDROID_DIR   "" CACHE PATH "Path to SDL2 source for Android")
 
     add_subdirectory(${SDL2_ANDROID_DIR} ${CMAKE_BINARY_DIR}/SDL2)
-
-    # Shared library — SDL2's Java activity loads this via System.loadLibrary()
-    add_library(SimpleVideoPlayer SHARED ${PLAYER_SOURCES})
-
-    target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR})
-
-    target_link_libraries(SimpleVideoPlayer
-        avcodec avformat avutil swscale swresample
-        SDL2
-        log  # Android logcat
-    )
+    set(SDL2_LINK_TARGET SDL2)
 
 else()
     set(FFMPEG_PREFIX "${CMAKE_SOURCE_DIR}/third_party/ffmpeg")
@@ -78,66 +44,43 @@ else()
         add_subdirectory(${tracy_SOURCE_DIR}/profiler ${CMAKE_BINARY_DIR}/tracy-profiler)
     endif()
 
-    foreach(lib avcodec avformat avutil swscale swresample)
-        add_library(${lib} SHARED IMPORTED)
-        set_target_properties(${lib} PROPERTIES
-            IMPORTED_LOCATION "${FFMPEG_LIB_DIR}/lib${lib}.so"
-        )
-    endforeach()
-
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    set(SDL2_LINK_TARGET PkgConfig::SDL2)
 
-    add_executable(${PROJECT_NAME} ${PLAYER_SOURCES})
+endif()
 
-    target_include_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIR})
-
-    target_link_libraries(${PROJECT_NAME}
-        avcodec avformat avutil swscale swresample
-        PkgConfig::SDL2
-        pthread
-        Tracy::TracyClient
+foreach(lib avcodec avformat avutil swscale swresample)
+    add_library(${lib} SHARED IMPORTED)
+    set_target_properties(${lib} PROPERTIES
+        IMPORTED_LOCATION "${FFMPEG_LIB_DIR}/lib${lib}.so"
     )
+endforeach()
 
-    set_target_properties(${PROJECT_NAME} PROPERTIES
+# ── Player library ────────────────────────────────────────────────────────────
+add_subdirectory(player)
+
+# ── Targets ───────────────────────────────────────────────────────────────────
+if(ANDROID)
+    add_library(SimpleVideoPlayer SHARED
+        android/app/src/main/cpp/android_client.cpp
+        src/FileMenu.cpp
+    )
+    target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR})
+    target_link_libraries(SimpleVideoPlayer player SDL2 log)
+
+else()
+    add_executable(SimpleVideoPlayer src/main.cpp)
+    target_link_libraries(SimpleVideoPlayer player)
+    set_target_properties(SimpleVideoPlayer PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
         BUILD_RPATH "${FFMPEG_LIB_DIR}"
     )
 
     add_executable(VideoServer src/server_main.cpp)
-
     target_include_directories(VideoServer PRIVATE ${FFMPEG_INCLUDE_DIR})
-
     target_link_libraries(VideoServer avcodec avformat avutil swscale swresample)
-
     set_target_properties(VideoServer PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        BUILD_RPATH "${FFMPEG_LIB_DIR}"
-    )
-
-    set(CLIENT_SOURCES
-        src/client_main.cpp
-        src/VideoPlayer.cpp
-        src/utility.cpp
-        src/VideoContainer.cpp
-        src/Decoder.cpp
-        src/Renderer.cpp
-        src/SdlContext.cpp
-        src/Converter.cpp
-    )
-
-    add_executable(VideoClient ${CLIENT_SOURCES})
-
-    target_include_directories(VideoClient PRIVATE ${FFMPEG_INCLUDE_DIR})
-
-    target_link_libraries(VideoClient
-        avcodec avformat avutil swscale swresample
-        PkgConfig::SDL2
-        pthread
-        Tracy::TracyClient
-    )
-
-    set_target_properties(VideoClient PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
         BUILD_RPATH "${FFMPEG_LIB_DIR}"
     )
