@@ -14,6 +14,7 @@ ConnectConfig::ConnectConfig() {
     }
     auto content = getFileContent(f);
     parseData(content);
+    LOG("main: server=%s port=%d\n", host_.c_str(), port_);
 }
 
 std::string ConnectConfig::getFileContent(FILE* f) {

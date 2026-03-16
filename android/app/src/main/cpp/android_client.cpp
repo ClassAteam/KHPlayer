@@ -1,4 +1,5 @@
 #include "ConnectConfig.h"
+#include "Connection.h"
 #include "FileMenu.h"
 #include "VideoPlayer.h"
 #include <SDL_main.h>
@@ -11,8 +12,9 @@
 int main(int argc, char* argv[]) {
 
     ConnectConfig connect_config;
-    LOG("main: server=%s port=%d\n", connect_config.host().c_str(), connect_config.port());
-    FileMenu menu(connect_config.host(), connect_config.port());
+    Connection connection(connect_config);
+
+    FileMenu menu(connection);
     LOG("main: running FileMenu\n");
     std::string video_url = menu.run();
     LOG("main: FileMenu returned '%s'\n", video_url.c_str());

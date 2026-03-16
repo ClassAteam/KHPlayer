@@ -62,7 +62,9 @@ if(ANDROID)
     add_library(SimpleVideoPlayer SHARED
         android/app/src/main/cpp/android_client.cpp
         android/app/src/main/cpp/ConnectConfig.cpp
+        android/app/src/main/cpp/Connection.cpp
         android/app/src/main/cpp/FileMenu.cpp
+        android/app/src/main/cpp/Parser.cpp
         android/app/src/main/cpp/Selector.cpp
         android/app/src/main/cpp/TextRenderer.cpp
     )
