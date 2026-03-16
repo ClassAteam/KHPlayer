@@ -25,4 +25,6 @@ else()
     target_link_libraries(player PRIVATE Tracy::TracyClient pthread)
 endif()
 
-add_subdirectory(tests)
+if(NOT ANDROID)
+    add_subdirectory(tests)
+endif()

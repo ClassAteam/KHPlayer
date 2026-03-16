@@ -73,19 +73,6 @@ if(ANDROID)
     target_link_libraries(SimpleVideoPlayer player SDL2 log)
 
 else()
-    add_executable(SimpleVideoPlayer src/main.cpp)
-    target_link_libraries(SimpleVideoPlayer player)
-    set_target_properties(SimpleVideoPlayer PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        BUILD_RPATH "${FFMPEG_LIB_DIR}"
-    )
-
-    add_executable(VideoServer src/server_main.cpp)
-    target_include_directories(VideoServer PRIVATE ${FFMPEG_INCLUDE_DIR})
-    target_link_libraries(VideoServer avcodec avformat avutil swscale swresample)
-    set_target_properties(VideoServer PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        BUILD_RPATH "${FFMPEG_LIB_DIR}"
-    )
+    add_subdirectory(server)
 
 endif()

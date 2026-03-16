@@ -1,3 +1,5 @@
+#include "VideoServer.h"
+
 #include <algorithm>
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -131,7 +133,6 @@ static void handle_not_found(int client_fd) {
     send_all(client_fd, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
 }
 
-// Read until \r\n\r\n and return the first request line.
 static std::string read_request_line(int client_fd) {
     std::string buf;
     char c;
@@ -146,17 +147,9 @@ static std::string read_request_line(int client_fd) {
     return eol != std::string::npos ? buf.substr(0, eol) : "";
 }
 
-int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: VideoServer <directory> <port>" << std::endl;
-        return 1;
-    }
+VideoServer::VideoServer(const std::string& dir, int port) : dir_(dir), port_(port) {}
 
-    std::string dir = argv[1];
-    if (!dir.empty() && dir.back() != '/')
-        dir += '/';
-    int port = std::stoi(argv[2]);
-
+void VideoServer::run() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -164,17 +157,17 @@ int main(int argc, char* argv[]) {
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
+    addr.sin_port = htons(port_);
     if (bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         std::cerr << "bind failed" << std::endl;
-        return 1;
+        return;
     }
     if (listen(server_fd, 5) < 0) {
         std::cerr << "listen failed" << std::endl;
-        return 1;
+        return;
     }
 
-    std::cout << "VideoServer listening on port " << port << ", serving: " << dir << std::endl;
+    std::cout << "VideoServer listening on port " << port_ << ", serving: " << dir_ << std::endl;
 
     while (true) {
         int client_fd = accept(server_fd, nullptr, nullptr);
@@ -182,7 +175,6 @@ int main(int argc, char* argv[]) {
             continue;
 
         std::string req = read_request_line(client_fd);
-        // Parse: "GET /path HTTP/1.x"
         size_t s1 = req.find(' ');
         size_t s2 = req.find(' ', s1 + 1);
         if (s1 == std::string::npos || s2 == std::string::npos) {
@@ -194,14 +186,14 @@ int main(int argc, char* argv[]) {
         std::cout << method << " " << path << std::endl;
 
         if (method == "GET" && path == "/files") {
-            handle_files(client_fd, scan_directory(dir));
+            handle_files(client_fd, scan_directory(dir_));
         } else if (method == "GET" && path.find("/stream?file=") == 0) {
             std::string filename = path.substr(13); // len("/stream?file=") == 13
             if (filename.find('/') != std::string::npos ||
                 filename.find("..") != std::string::npos) {
                 handle_not_found(client_fd);
             } else {
-                handle_stream(client_fd, dir + filename);
+                handle_stream(client_fd, dir_ + filename);
             }
         } else {
             handle_not_found(client_fd);
@@ -211,5 +203,4 @@ int main(int argc, char* argv[]) {
     }
 
     close(server_fd);
-    return 0;
 }
