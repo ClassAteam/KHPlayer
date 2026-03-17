@@ -1,7 +1,13 @@
 add_executable(VideoServer
     main.cpp
-    src/VideoServer.cpp
-)
+    src/Directory.cpp
+    src/ErrorResponse.cpp
+    src/FileListHttpResponse.cpp
+    src/FileStream.cpp
+    src/HttpConnection.cpp
+    src/HttpRequest.cpp
+    src/VideoReadyHttpResponse.cpp
+    src/VideoServer.cpp)
 
 target_include_directories(VideoServer
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
