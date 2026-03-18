@@ -53,8 +53,22 @@ std::string Connection::waitResponse() {
     return response;
 }
 
+static std::string urlEncode(const std::string& s) {
+    std::string result;
+    for (unsigned char c : s) {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+            result += c;
+        else {
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%%%02X", c);
+            result += buf;
+        }
+    }
+    return result;
+}
+
 std::string Connection::streamUrl(const std::string& filename) const {
-    return "http://" + host_ + ":" + std::to_string(port_) + "/stream?file=" + filename;
+    return "http://" + host_ + ":" + std::to_string(port_) + "/stream?file=" + urlEncode(filename);
 }
 
 std::vector<std::string> Connection::retrieveFiles() {

@@ -15,7 +15,7 @@ void Parser::skipHttpHeader() {
 
 void Parser::parseJson() {
     size_t lb = body_.find('[');
-    size_t rb = body_.find(']');
+    size_t rb = body_.rfind(']');
     if (lb == std::string::npos || rb == std::string::npos || rb <= lb)
         throw std::runtime_error("invalid JSON format");
     std::string inner = body_.substr(lb + 1, rb - lb - 1);

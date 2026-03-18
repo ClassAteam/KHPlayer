@@ -72,35 +72,38 @@ void SdlContext::sdlAudioCallback(void* userdata, uint8_t* stream, int len) {
 void SdlContext::audioCallback(uint8_t* stream, int len) {
     SDL_memset(stream, 0, len);
 
-    auto frame_opt = audio_queue_.try_pop();
-    if (!frame_opt) return;
+    while ((int)audio_buf_.size() < len) {
+        auto frame_opt = audio_queue_.try_pop();
+        if (!frame_opt) break;
 
-    AVFrame* frame = *frame_opt;
+        AVFrame* frame = *frame_opt;
 
-    int out_buffer_size = av_samples_get_buffer_size(nullptr, number_of_channels_,
-                                                     frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+        int out_buffer_size = av_samples_get_buffer_size(nullptr, number_of_channels_,
+                                                         frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+        uint8_t* output = (uint8_t*)av_malloc(out_buffer_size);
+        if (!output) {
+            av_frame_free(&frame);
+            break;
+        }
 
-    uint8_t* output = (uint8_t*)av_malloc(out_buffer_size);
-    if (!output) {
+        uint8_t* out_ptr = output;
+        int out_samples = swr_convert(swr_ctx_, &out_ptr, frame->nb_samples,
+                                      (const uint8_t**)frame->data, frame->nb_samples);
+        if (out_samples > 0) {
+            int data_size = out_samples * number_of_channels_ * sizeof(int16_t);
+            audio_buf_.insert(audio_buf_.end(), output, output + data_size);
+            audio_clock_.store(frame->pts * time_base_);
+        }
+
+        av_free(output);
         av_frame_free(&frame);
-        return;
     }
 
-    uint8_t* out_ptr = output;
-    int out_samples = swr_convert(swr_ctx_, &out_ptr, frame->nb_samples,
-                                  (const uint8_t**)frame->data, frame->nb_samples);
-
-    if (out_samples > 0) {
-        int data_size = out_samples * number_of_channels_ * sizeof(int16_t);
-        int copy_size = (data_size < len) ? data_size : len;
-        SDL_MixAudioFormat(stream, output, AUDIO_S16SYS, copy_size, SDL_MIX_MAXVOLUME);
-
-        double pts = frame->pts * time_base_;
-        audio_clock_.store(pts);
+    int copy_size = std::min((int)audio_buf_.size(), len);
+    if (copy_size > 0) {
+        SDL_MixAudioFormat(stream, audio_buf_.data(), AUDIO_S16SYS, copy_size, SDL_MIX_MAXVOLUME);
+        audio_buf_.erase(audio_buf_.begin(), audio_buf_.begin() + copy_size);
     }
-
-    av_free(output);
-    av_frame_free(&frame);
 }
 void SdlContext::initAudioDevice(int sample_rate, int num_of_channels) {
 

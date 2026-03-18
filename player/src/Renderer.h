@@ -3,11 +3,14 @@
 #include <SDL_render.h>
 #include <SdlContext.h>
 #include <atomic>
+extern "C" {
+#include <libavutil/rational.h>
+}
 
 class Renderer {
 public:
     Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
-             std::atomic<bool>& paused);
+             std::atomic<bool>& paused, AVRational avg_frame_rate);
     void renderFrame();
 
 private:

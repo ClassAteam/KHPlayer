@@ -18,13 +18,13 @@ extern "C" {
 }
 
 Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
-                   std::atomic<bool>& paused)
+                   std::atomic<bool>& paused, AVRational avg_frame_rate)
     : converter_(converter), sdl_context_(sdl_context), quit_(quit), paused_(paused) {
 
     texture_ = sdl_context.getTexture();
     renderer_ = sdl_context.getRenderer();
     frame_last_pts_ = 0.0;
-    frame_last_delay_ = 1.0 / 25.0;
+    frame_last_delay_ = (avg_frame_rate.num > 0) ? av_q2d(av_inv_q(avg_frame_rate)) : 1.0 / 25.0;
 }
 
 void Renderer::renderFrame() {

@@ -9,6 +9,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 #include <atomic>
+#include <vector>
 
 class SdlContext {
 public:
@@ -42,4 +43,5 @@ private:
     int number_of_channels_;
     double time_base_;
     std::atomic<double> audio_clock_{0.0};
+    std::vector<uint8_t> audio_buf_;
 };

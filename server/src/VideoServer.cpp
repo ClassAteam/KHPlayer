@@ -52,9 +52,22 @@ void VideoServer::handleListFiles(HttpConnection& conn) {
     conn.sendAll(response.data());
 }
 
-void VideoServer::startStream(HttpConnection& conn, const std::string& path) {
+static std::string urlDecode(const std::string& s) {
+    std::string result;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '%' && i + 2 < s.size()) {
+            int c = std::stoi(s.substr(i + 1, 2), nullptr, 16);
+            result += static_cast<char>(c);
+            i += 2;
+        } else {
+            result += s[i];
+        }
+    }
+    return result;
+}
 
-    std::string filename = path.substr(13); // len("/stream?file=") == 13
+void VideoServer::startStream(HttpConnection& conn, const std::string& path) {
+    std::string filename = urlDecode(path.substr(13)); // len("/stream?file=") == 13
     if (isSafeFilename(filename))
         FileStream(conn, dir_ + filename);
 }
