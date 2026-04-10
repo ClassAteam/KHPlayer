@@ -7,6 +7,12 @@ extern "C" {
 #include <libavutil/rational.h>
 }
 
+struct FrameStats {
+    double wall_interval{0};   // actual wall time between frames
+    double av_diff{0};         // pts - audio_clock
+    double sleep_requested{0}; // actual_delay passed to av_usleep
+};
+
 class Renderer {
 public:
     Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
@@ -14,7 +20,9 @@ public:
     void renderFrame();
 
 private:
-    void delay(double pts);
+    void delay(double pts, FrameStats& stats);
+    void printStats(const FrameStats& stats);
+
     SDL_Texture* texture_;
     SDL_Renderer* renderer_;
     Converter& converter_;
@@ -25,4 +33,12 @@ private:
     double frame_last_pts_;
     double frame_last_delay_;
     double frame_timer_;
+
+    // timing accumulators, reset every kStatWindow frames
+    static constexpr int kStatWindow = 30;
+    int stat_frame_{0};
+    double sum_wall_{0}, max_wall_{0};
+    double sum_diff_{0};
+    double sum_sleep_{0}, max_sleep_{0};
+    double last_frame_wall_{0};
 };

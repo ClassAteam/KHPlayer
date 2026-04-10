@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <optional>
 #include <ostream>
@@ -16,6 +17,12 @@
 extern "C" {
 #include <libavutil/time.h>
 }
+#ifdef __ANDROID__
+#include <android/log.h>
+#define TIMING_LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
+#else
+#define TIMING_LOG(...) fprintf(stderr, __VA_ARGS__)
+#endif
 
 Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bool>& quit,
                    std::atomic<bool>& paused, AVRational avg_frame_rate)
@@ -28,7 +35,8 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bo
 }
 
 void Renderer::renderFrame() {
-    frame_timer_ = static_cast<double>(av_gettime()) / 1000000.0;
+    TIMING_LOG("Renderer::renderFrame() started\n");
+    bool first_frame = true;
     while (!quit_) {
 
         SDL_Event event;
@@ -53,6 +61,13 @@ void Renderer::renderFrame() {
 
         auto image = result.value();
 
+        double frame_start = static_cast<double>(av_gettime()) / 1000000.0;
+
+        if (first_frame) {
+            frame_timer_ = frame_start;
+            first_frame = false;
+        }
+
         if (SDL_UpdateTexture(texture_, nullptr, image.bgra->data[0], image.bgra->linesize[0]) < 0)
             std::cerr << "SDL_UpdateTexture failed: " << SDL_GetError() << std::endl;
         if (SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255) < 0)
@@ -62,13 +77,44 @@ void Renderer::renderFrame() {
         if (SDL_RenderCopy(renderer_, texture_, nullptr, nullptr) < 0)
             std::cerr << "SDL_RenderCopy failed: " << SDL_GetError() << std::endl;
         SDL_RenderPresent(renderer_);
-        delay(image.pts);
+
+        FrameStats stats;
+        stats.wall_interval = frame_start - last_frame_wall_;
+        last_frame_wall_ = frame_start;
+        delay(image.pts, stats);
+        printStats(stats);
 
         av_frame_free(&image.bgra);
     }
 }
 
-void Renderer::delay(double pts) {
+void Renderer::printStats(const FrameStats& s) {
+    if (stat_frame_ == 0) {
+        // skip first frame — wall_interval is meaningless (was 0 at init)
+        stat_frame_++;
+        return;
+    }
+    sum_wall_  += s.wall_interval;
+    max_wall_   = std::max(max_wall_,  s.wall_interval);
+    sum_diff_  += std::fabs(s.av_diff);
+    sum_sleep_ += s.sleep_requested;
+    max_sleep_  = std::max(max_sleep_, s.sleep_requested);
+
+    if (++stat_frame_ >= kStatWindow) {
+        double n = kStatWindow - 1; // exclude first skipped frame
+        TIMING_LOG(
+                "[timing] wall avg=%.1fms max=%.1fms | sleep avg=%.1fms max=%.1fms | |av_diff| avg=%.1fms\n",
+                sum_wall_  / n * 1000.0,
+                max_wall_       * 1000.0,
+                sum_sleep_ / n * 1000.0,
+                max_sleep_      * 1000.0,
+                sum_diff_  / n * 1000.0);
+        stat_frame_ = 0;
+        sum_wall_ = max_wall_ = sum_diff_ = sum_sleep_ = max_sleep_ = 0;
+    }
+}
+
+void Renderer::delay(double pts, FrameStats& stats) {
     double delay = pts - frame_last_pts_;
     if (delay <= 0 || delay >= 1.0)
         delay = frame_last_delay_;
@@ -89,4 +135,7 @@ void Renderer::delay(double pts) {
     double actual_delay = frame_timer_ - (static_cast<double>(av_gettime()) / 1000000.0);
     if (actual_delay > 0.0 && actual_delay < 1.0)
         av_usleep(static_cast<unsigned int>(actual_delay * 1000000.0));
+
+    stats.av_diff = diff;
+    stats.sleep_requested = (actual_delay > 0.0 && actual_delay < 1.0) ? actual_delay : 0.0;
 }

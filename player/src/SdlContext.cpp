@@ -17,13 +17,14 @@ SdlContext::SdlContext(const VideoContainer& container)
     }
     initWindow(container.getWidth(), container.getHeight());
     initRenderer();
+    number_of_channels_ = container.getNumberOfChannels();
+    sample_rate_ = container.sampleRate();
+    time_base_ = container.audioTimeBase();
     initAudioDevice(container.sampleRate(), container.getNumberOfChannels());
     createTexture(container.getWidth(), container.getHeight());
     SDL_RaiseWindow(window_);
     SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
     createScaler(container.getWidth(), container.getHeight(), container.getPixelFromat());
-    number_of_channels_ = container.getNumberOfChannels();
-    time_base_ = container.audioTimeBase();
     initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
                          container.sampleFormat());
 }
@@ -91,8 +92,9 @@ void SdlContext::audioCallback(uint8_t* stream, int len) {
                                       (const uint8_t**)frame->data, frame->nb_samples);
         if (out_samples > 0) {
             int data_size = out_samples * number_of_channels_ * sizeof(int16_t);
+            if (audio_buf_.empty())
+                audio_buf_start_pts_ = frame->pts * time_base_;
             audio_buf_.insert(audio_buf_.end(), output, output + data_size);
-            audio_clock_.store(frame->pts * time_base_);
         }
 
         av_free(output);
@@ -101,8 +103,11 @@ void SdlContext::audioCallback(uint8_t* stream, int len) {
 
     int copy_size = std::min((int)audio_buf_.size(), len);
     if (copy_size > 0) {
+        audio_clock_.store(audio_buf_start_pts_);
         SDL_MixAudioFormat(stream, audio_buf_.data(), AUDIO_S16SYS, copy_size, SDL_MIX_MAXVOLUME);
         audio_buf_.erase(audio_buf_.begin(), audio_buf_.begin() + copy_size);
+        audio_buf_start_pts_ +=
+            (double)copy_size / (sample_rate_ * number_of_channels_ * sizeof(int16_t));
     }
 }
 void SdlContext::initAudioDevice(int sample_rate, int num_of_channels) {

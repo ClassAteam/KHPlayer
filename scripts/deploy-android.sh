@@ -91,6 +91,8 @@ if [ ! -f "gradlew" ]; then
 fi
 
 # ── Build ─────────────────────────────────────────────────────────────────────
+echo "==> Cleaning native build cache..."
+./gradlew cleanExternalNativeBuildDebug
 echo "==> Building debug APK..."
 ./gradlew assembleDebug
 

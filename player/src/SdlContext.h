@@ -44,4 +44,6 @@ private:
     double time_base_;
     std::atomic<double> audio_clock_{0.0};
     std::vector<uint8_t> audio_buf_;
+    double audio_buf_start_pts_{0.0};
+    int sample_rate_{0};
 };
