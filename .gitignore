@@ -17,3 +17,6 @@ build-tsan/
 build-prof/
 perf.data*
 build-tracy/
+fixtures/*.mkv
+fixtures/*.mp4
+fixtures/*.avi
