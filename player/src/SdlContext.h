@@ -6,16 +6,28 @@
 #include <SDL_video.h>
 extern "C" {
 #include <libswresample/swresample.h>
-#include <libswscale/swscale.h>
 }
 #include <atomic>
 #include <vector>
+#ifdef __ANDROID__
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#include <jni.h>
+#endif
 
 class SdlContext {
 public:
     SdlContext(const VideoContainer& container);
     ~SdlContext();
-    SwsContext* getScalerContext();
+
+    // Returns the Java Surface jobject (Android only, null on other platforms).
+    // Call this after the constructor, before VideoContainer::openCodecs().
+    void* setupGLSurfaceRenderer();
+
+    // Calls SurfaceTexture.updateTexImage(), draws the GL_TEXTURE_EXTERNAL_OES
+    // quad, and presents. Only does anything on Android.
+    void renderMediaCodecFrame();
+
     SDL_Renderer* getRenderer();
     SDL_Texture* getTexture();
     void pushAudioFrame(AVFrame* frame);
@@ -23,16 +35,19 @@ public:
     void pauseAudio(bool paused);
 
 private:
-    void initWindow(int widht, int height);
+    void initWindow(int width, int height);
     void initRenderer();
-    void createTexture(int widht, int height);
-    void createScaler(int width, int height, AVPixelFormat format);
+    void createTexture(int width, int height);
     void initAudioDevice(int sample_rate, int channels);
     static void sdlAudioCallback(void* userdata, uint8_t* stream, int len);
     void audioCallback(uint8_t* stream, int len);
     void initResamplerContext(AVChannelLayout ch_layout, int sample_rate, AVSampleFormat fmt);
 
-    SwsContext* sws_ctx_;
+#ifdef __ANDROID__
+    void compileGLShaders();
+    void createQuadVBO();
+#endif
+
     SwrContext* swr_ctx_;
 
     SDL_Window* window_;
@@ -46,4 +61,20 @@ private:
     std::vector<uint8_t> audio_buf_;
     double audio_buf_start_pts_{0.0};
     int sample_rate_{0};
+
+#ifdef __ANDROID__
+    GLuint external_gl_tex_{0};
+    GLuint shader_program_{0};
+    GLuint quad_vbo_{0};
+    GLint  position_loc_{-1};
+    GLint  texcoord_loc_{-1};
+    GLint  tex_matrix_loc_{-1};
+    GLint  video_tex_loc_{-1};
+    jobject surface_texture_{nullptr};   // global JNI ref
+    jobject media_surface_{nullptr};     // global JNI ref
+    jmethodID update_tex_image_{nullptr};
+    jmethodID get_transform_matrix_{nullptr};
+    int window_width_{0};
+    int window_height_{0};
+#endif
 };

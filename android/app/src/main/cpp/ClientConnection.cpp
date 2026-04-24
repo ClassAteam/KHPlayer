@@ -1,4 +1,4 @@
-#include "Connection.h"
+#include "ClientConnection.h"
 #include "Parser.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -14,11 +14,12 @@
 #define LOG(...) printf(__VA_ARGS__)
 #endif
 
-Connection::Connection(ConnectConfig& config) : host_(config.host()), port_(config.port()) {
+ClientConnection::ClientConnection(ConnectConfig& config)
+    : host_(config.host()), port_(config.port()) {
     establishConnection();
 }
 
-void Connection::establishConnection() {
+void ClientConnection::establishConnection() {
     LOG("Connection: connecting to %s:%d\n", host_.c_str(), port_);
     sock_ = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_ < 0)
@@ -37,13 +38,13 @@ void Connection::establishConnection() {
     }
 }
 
-void Connection::requestFiles() {
+void ClientConnection::requestFiles() {
     std::string request =
         "GET /files HTTP/1.0\r\nHost: " + host_ + ":" + std::to_string(port_) + "\r\n\r\n";
     send(sock_, request.data(), request.size(), 0);
 }
 
-std::string Connection::waitResponse() {
+std::string ClientConnection::waitResponse() {
     std::string response;
     char buf[4096];
     ssize_t n;
@@ -67,11 +68,11 @@ static std::string urlEncode(const std::string& s) {
     return result;
 }
 
-std::string Connection::streamUrl(const std::string& filename) const {
+std::string ClientConnection::streamUrl(const std::string& filename) const {
     return "http://" + host_ + ":" + std::to_string(port_) + "/stream?file=" + urlEncode(filename);
 }
 
-std::vector<std::string> Connection::retrieveFiles() {
+std::vector<std::string> ClientConnection::retrieveFiles() {
     requestFiles();
     auto response = waitResponse();
     Parser parser(response);

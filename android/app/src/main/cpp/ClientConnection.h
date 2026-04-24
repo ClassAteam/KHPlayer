@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-class Connection {
+class ClientConnection {
 public:
-    explicit Connection(ConnectConfig& config);
+    explicit ClientConnection(ConnectConfig& config);
     std::vector<std::string> retrieveFiles();
     std::string streamUrl(const std::string& filename) const;
 

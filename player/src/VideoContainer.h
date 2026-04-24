@@ -8,6 +8,11 @@ extern "C" {
 class VideoContainer {
 public:
     VideoContainer(const std::string& filename);
+    ~VideoContainer();
+    // Phase 2 init: open codecs with optional MediaCodec surface
+    // Must be called after SdlContext sets up the GL surface.
+    void openCodecs(void* surface = nullptr);
+
     double getDuration() const;
     double getWidth() const;
     double getHeight() const;
@@ -28,12 +33,16 @@ public:
 private:
     void openContainer(const std::string& filename);
     void findStreamInfo();
-    void initCodecs();
-    void initVideoCodec(AVCodecParameters* codec_params, int index, const AVCodec* codec);
-    void initAudioCodec(AVCodecParameters* codec_params, int index, const AVCodec* codec);
+    void allocCodecContexts();
+    void allocVideoCodecContext(AVCodecParameters* params, int index, const AVCodec* codec);
+    void allocAudioCodecContext(AVCodecParameters* params, int index, const AVCodec* codec);
+
     AVFormatContext* format_ctx_;
     int video_stream_index_{-1};
     int audio_stream_index_{-1};
-    AVCodecContext* video_codec_ctx_;
-    AVCodecContext* audio_codec_ctx_;
+    AVCodecContext* video_codec_ctx_{nullptr};
+    AVCodecContext* audio_codec_ctx_{nullptr};
+    const AVCodec* video_codec_{nullptr};
+    const AVCodec* audio_codec_{nullptr};
+
 };

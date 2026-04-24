@@ -3,8 +3,17 @@
 #include <iostream>
 #include <optional>
 extern "C" {
+#include <inttypes.h>
 #include <libavformat/avformat.h>
+#include <libavutil/time.h>
 }
+#ifdef ANDROID
+#include <android/log.h>
+#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
+#else
+#include <cstdio>
+#define LOG(...) printf(__VA_ARGS__)
+#endif
 #include <ostream>
 #include <thread>
 #ifdef TRACY_ENABLE
@@ -52,10 +61,11 @@ void Decoder::decode(std::atomic<bool>& quit, bool loop) {
 void Decoder::decodeVideoPacket() {
     auto codec_ctxt = container_.getVideoCodecContext();
     auto time_base = container_.videoTimeBase();
+
     avcodec_send_packet(codec_ctxt, packet_);
 
-    while (avcodec_receive_frame(codec_ctxt, frame_) == 0) {
-
+    int recv_ret;
+    while ((recv_ret = avcodec_receive_frame(codec_ctxt, frame_)) == 0) {
         double pts;
         if (frame_->pts != AV_NOPTS_VALUE) {
             pts = frame_->pts * time_base;
@@ -74,9 +84,11 @@ void Decoder::decodeVideoPacket() {
         }
         video_frame_count_++;
 
-        AVFrame* clone = av_frame_clone(frame_);
-        if (!video_queue_.push({clone, pts})) {
-            av_frame_free(&clone);
+        AVFrame* output_frame = av_frame_clone(frame_);
+        av_frame_unref(frame_);
+
+        if (!video_queue_.push({output_frame, pts})) {
+            av_frame_free(&output_frame);
             break;
         }
     }

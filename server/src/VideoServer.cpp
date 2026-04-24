@@ -24,6 +24,7 @@ void VideoServer::run() {
 
     while (true) {
         int connection_fd = accept(socket_fd_, nullptr, nullptr);
+        fprintf(stderr, "connection accepted\n");
         if (connection_fd < 0)
             continue;
 

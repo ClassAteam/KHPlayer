@@ -5,6 +5,7 @@
 #include <utility>
 
 HttpRequest::HttpRequest(std::string raw_line) : raw_line_(std::move(raw_line)) {
+    fprintf(stderr, "request recieved\n");
     firstLine();
     parseMethod();
     parsePath();

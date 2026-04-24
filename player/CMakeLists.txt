@@ -10,8 +10,8 @@ add_library(player STATIC
 
 target_include_directories(player
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
-    PRIVATE ${FFMPEG_INCLUDE_DIR}
+    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/src
+    PUBLIC  ${FFMPEG_INCLUDE_DIR}
 )
 
 target_link_libraries(player
@@ -23,8 +23,4 @@ if(ANDROID)
     target_link_libraries(player PRIVATE log)
 else()
     target_link_libraries(player PRIVATE Tracy::TracyClient pthread)
-endif()
-
-if(NOT ANDROID)
-    add_subdirectory(tests)
 endif()

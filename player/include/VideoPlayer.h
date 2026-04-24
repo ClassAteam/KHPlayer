@@ -1,5 +1,9 @@
 #pragma once
-#include <memory>
+#include "Decoder.h"
+#include "SdlContext.h"
+#include "Converter.h"
+#include "Renderer.h"
+#include <atomic>
 #include <string>
 
 class VideoPlayer {
@@ -10,6 +14,10 @@ public:
     ~VideoPlayer();
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::atomic<bool> quit_{false};
+    std::atomic<bool> paused_{false};
+    Decoder decoder_;
+    SdlContext sdl_context_;
+    Converter converter_;
+    Renderer renderer_;
 };

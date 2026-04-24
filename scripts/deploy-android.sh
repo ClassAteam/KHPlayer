@@ -24,7 +24,7 @@ PACKAGE="com.simplevideoplayer"
 ACTIVITY=".MainActivity"
 SERVER_ADDR="${1:-192.168.0.106:8080}"
 VIDEOS_DIR="${2:-$ROOT/fixtures}"
-SERVER_BIN="$ROOT/build/bin/VideoServer"
+SERVER_BIN="$ROOT/build/bin/video_server"
 RPATH="$ROOT/third_party/ffmpeg/linux-x86_64"
 SERVER_PORT="${SERVER_ADDR##*:}"
 SERVER_PID=""
@@ -42,11 +42,11 @@ trap cleanup EXIT
 
 # ── Start VideoServer ─────────────────────────────────────────────────────────
 if [[ ! -x "$SERVER_BIN" ]]; then
-    echo "ERROR: VideoServer not built. Run: cmake --build build --target VideoServer"
+    echo "ERROR: video_server not built. Run: cmake --build build --target video_server"
     exit 1
 fi
 echo "==> Starting VideoServer on port $SERVER_PORT, serving: $VIDEOS_DIR"
-LD_LIBRARY_PATH="$RPATH" "$SERVER_BIN" "$VIDEOS_DIR" "$SERVER_PORT" &>/dev/null &
+LD_LIBRARY_PATH="$RPATH" "$SERVER_BIN" "$VIDEOS_DIR" "$SERVER_PORT" &
 SERVER_PID=$!
 sleep 0.5
 if ! kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -91,9 +91,8 @@ if [ ! -f "gradlew" ]; then
 fi
 
 # ── Build ─────────────────────────────────────────────────────────────────────
-echo "==> Cleaning native build cache..."
-./gradlew cleanExternalNativeBuildDebug
-echo "==> Building debug APK..."
+echo "==> Building debug APK (forcing C++ recompile)..."
+./gradlew externalNativeBuildDebug --rerun-tasks
 ./gradlew assembleDebug
 
 # ── Deploy ────────────────────────────────────────────────────────────────────
@@ -121,7 +120,7 @@ echo "    Tailing logs (Ctrl+C stops server and exits):"
 echo ""
 
 # Tail logs and keep server alive until the user interrupts
-$ADB logcat -s SDL:V SimpleVideoPlayer:V &
+$ADB logcat "*:S SimpleVideoPlayer:V AndroidRuntime:E" &
 LOGCAT_PID=$!
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""

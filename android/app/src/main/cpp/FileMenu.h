@@ -1,5 +1,5 @@
 #pragma once
-#include "Connection.h"
+#include "ClientConnection.h"
 #include "MenuRenderer.h"
 #include "Selector.h"
 #include <SDL.h>
@@ -8,7 +8,7 @@
 
 class FileMenu {
 public:
-    explicit FileMenu(Connection& connection);
+    explicit FileMenu(ClientConnection& connection);
     ~FileMenu();
     std::string run();
 
@@ -16,10 +16,10 @@ private:
     void initWindow();
     void initRenderer();
     void renderErrorScreen();
-    void handleEvent(const SDL_Event& e, const std::vector<std::string>& files,
-                     std::string& result, bool& running);
+    void handleEvent(const SDL_Event& e, const std::vector<std::string>& files, std::string& result,
+                     bool& running);
 
-    Connection& connection_;
+    ClientConnection& connection_;
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     MenuRenderer menu_renderer_;

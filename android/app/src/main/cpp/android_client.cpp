@@ -1,5 +1,5 @@
+#include "ClientConnection.h"
 #include "ConnectConfig.h"
-#include "Connection.h"
 #include "FileMenu.h"
 #include "VideoPlayer.h"
 #include <SDL_main.h>
@@ -12,7 +12,7 @@
 int main(int argc, char* argv[]) {
 
     ConnectConfig connect_config;
-    Connection connection(connect_config);
+    ClientConnection connection(connect_config);
 
     FileMenu menu(connection);
     LOG("main: running FileMenu\n");

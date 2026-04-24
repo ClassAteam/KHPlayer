@@ -1,34 +1,32 @@
 #include "VideoPlayer.h"
-#include "Converter.h"
-#include "Decoder.h"
-#include "Renderer.h"
-#include "SdlContext.h"
 #include "utility.h"
-#include <atomic>
 #include <chrono>
-#include <iostream>
 #include <thread>
 #ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
 #endif
-
-struct VideoPlayer::Impl {
-    std::atomic<bool> quit_{false};
-    std::atomic<bool> paused_{false};
-    Decoder decoder_;
-    SdlContext sdl_context_;
-    Converter converter_;
-    Renderer renderer_;
-
-    Impl(const std::string& filename)
-        : decoder_(filename), sdl_context_(decoder_.getContainer()),
-          converter_(decoder_, sdl_context_),
-          renderer_(converter_, sdl_context_, quit_, paused_,
-                    decoder_.getContainer().averageFrameRate()) {}
-};
+#ifdef ANDROID
+#include <SDL_system.h>
+#include <jni.h>
+extern "C" {
+#include <libavcodec/jni.h>
+}
+#endif
 
 VideoPlayer::VideoPlayer(const std::string& filename)
-    : impl_(std::make_unique<Impl>(filename)) {}
+    : decoder_(filename), sdl_context_(decoder_.getContainer()), converter_(decoder_),
+      renderer_(converter_, sdl_context_, quit_, paused_,
+                decoder_.getContainer().averageFrameRate()) {
+    void* surface = nullptr;
+#ifdef ANDROID
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    JavaVM* vm = nullptr;
+    env->GetJavaVM(&vm);
+    av_jni_set_java_vm(vm, nullptr);
+    surface = sdl_context_.setupGLSurfaceRenderer();
+#endif
+    decoder_.getContainer().openCodecs(surface);
+}
 
 VideoPlayer::~VideoPlayer() = default;
 
@@ -37,33 +35,33 @@ void VideoPlayer::test() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Decoder");
 #endif
-        impl_->decoder_.decode(impl_->quit_);
+        decoder_.decode(quit_);
     });
     std::thread receive([this]() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Converter");
 #endif
-        impl_->converter_.convert(impl_->quit_, impl_->paused_);
+        converter_.convert(quit_, paused_);
     });
     std::thread audio_feed([this]() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("AudioFeed");
 #endif
-        while (!impl_->quit_) {
-            if (impl_->paused_) {
+        while (!quit_) {
+            if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
-            auto frame = impl_->decoder_.getAudioFrame();
+            auto frame = decoder_.getAudioFrame();
             if (!frame)
                 break;
-            impl_->sdl_context_.pushAudioFrame(*frame);
+            sdl_context_.pushAudioFrame(*frame);
         }
     });
 
-    impl_->renderer_.renderFrame();
-    impl_->decoder_.closeQueues();
-    impl_->converter_.close();
+    renderer_.renderFrame();
+    decoder_.closeQueues();
+    converter_.close();
 
     decoding.join();
     receive.join();
@@ -75,35 +73,35 @@ void VideoPlayer::test_loop() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Decoder");
 #endif
-        impl_->decoder_.decode(impl_->quit_, true);
+        decoder_.decode(quit_, true);
     });
 
     std::thread receive([this]() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Converter");
 #endif
-        impl_->converter_.convert(impl_->quit_, impl_->paused_);
+        converter_.convert(quit_, paused_);
     });
 
     std::thread audio_feed([this]() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("AudioFeed");
 #endif
-        while (!impl_->quit_) {
-            if (impl_->paused_) {
+        while (!quit_) {
+            if (paused_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
-            auto frame = impl_->decoder_.getAudioFrame();
+            auto frame = decoder_.getAudioFrame();
             if (!frame)
                 break;
-            impl_->sdl_context_.pushAudioFrame(*frame);
+            sdl_context_.pushAudioFrame(*frame);
         }
     });
 
-    impl_->renderer_.renderFrame();
-    impl_->decoder_.closeQueues();
-    impl_->converter_.close();
+    renderer_.renderFrame();
+    decoder_.closeQueues();
+    converter_.close();
 
     decoding.join();
     receive.join();
