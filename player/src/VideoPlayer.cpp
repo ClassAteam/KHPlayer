@@ -1,5 +1,5 @@
 #include "VideoPlayer.h"
-#include "utility.h"
+#include "logging.h"
 #include <chrono>
 #include <thread>
 #ifdef TRACY_ENABLE
@@ -23,9 +23,12 @@ VideoPlayer::VideoPlayer(const std::string& filename)
     JavaVM* vm = nullptr;
     env->GetJavaVM(&vm);
     av_jni_set_java_vm(vm, nullptr);
+
     surface = sdl_context_.setupGLSurfaceRenderer();
+    LOG("openCodecs: entering");
 #endif
     decoder_.getContainer().openCodecs(surface);
+    LOG("codec are opened");
 }
 
 VideoPlayer::~VideoPlayer() = default;

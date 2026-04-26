@@ -25,5 +25,5 @@ elif [ "$PROFILE" = "--htop" ]; then
 else
     cmake -B build -S . -DTRACY_ENABLE=OFF -DTRACY_PROFILER=OFF
     cmake --build build
-    ./build/bin/SimpleVideoPlayer fixtures/sample2.mkv
+    ./build/bin/SimpleVideoPlayer fixtures/sample1.mp4
 fi

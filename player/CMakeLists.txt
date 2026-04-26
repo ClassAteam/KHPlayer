@@ -12,6 +12,7 @@ target_include_directories(player
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/src
     PUBLIC  ${FFMPEG_INCLUDE_DIR}
+    PUBLIC ${CMAKE_SOURCE_DIR}/common
 )
 
 target_link_libraries(player
@@ -19,8 +20,6 @@ target_link_libraries(player
     PRIVATE ${SDL2_LINK_TARGET}
 )
 
-if(ANDROID)
-    target_link_libraries(player PRIVATE log)
-else()
+if(NOT ANDROID)
     target_link_libraries(player PRIVATE Tracy::TracyClient pthread)
 endif()

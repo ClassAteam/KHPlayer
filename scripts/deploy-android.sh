@@ -45,6 +45,13 @@ if [[ ! -x "$SERVER_BIN" ]]; then
     echo "ERROR: video_server not built. Run: cmake --build build --target video_server"
     exit 1
 fi
+stale_pid=$(lsof -ti:"$SERVER_PORT" 2>/dev/null || true)
+if [[ -n "$stale_pid" ]]; then
+    echo "==> Killing stale process on port $SERVER_PORT (pid $stale_pid)..."
+    kill "$stale_pid" 2>/dev/null || true
+    sleep 0.3
+fi
+
 echo "==> Starting VideoServer on port $SERVER_PORT, serving: $VIDEOS_DIR"
 LD_LIBRARY_PATH="$RPATH" "$SERVER_BIN" "$VIDEOS_DIR" "$SERVER_PORT" &
 SERVER_PID=$!
@@ -111,16 +118,21 @@ $ADB shell "mkdir -p /sdcard/Android/data/com.simplevideoplayer/files"
 $ADB push /tmp/svp_server.txt /sdcard/Android/data/com.simplevideoplayer/files/svp_server.txt
 
 # ── Launch ────────────────────────────────────────────────────────────────────
+$ADB logcat -c
+
 echo "==> Launching app..."
 $ADB shell am start -n "${PACKAGE}/${ACTIVITY}"
+sleep 2
+
+APP_PID=$($ADB shell pidof "$PACKAGE" 2>/dev/null | tr -d '[:space:]' || true)
 
 echo ""
-echo "==> App launched. VideoServer is running — use the TV remote to pick a file."
+echo "==> App launched (pid ${APP_PID:-unknown}). VideoServer is running — use the TV remote to pick a file."
 echo "    Tailing logs (Ctrl+C stops server and exits):"
 echo ""
 
-# Tail logs and keep server alive until the user interrupts
-$ADB logcat "*:S SimpleVideoPlayer:V AndroidRuntime:E" &
+PID_FILTER=${APP_PID:+--pid=$APP_PID}
+$ADB logcat $PID_FILTER -s SimpleVideoPlayer:V AndroidRuntime:E System.err:W DEBUG:E CRASH:E &
 LOGCAT_PID=$!
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""

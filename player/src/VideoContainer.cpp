@@ -1,15 +1,9 @@
 #include "VideoContainer.h"
+#include "logging.h"
 #include <stdexcept>
-#ifdef ANDROID
-#include <android/log.h>
 extern "C" {
 #include <libavcodec/mediacodec.h>
 }
-#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOG(...) printf(__VA_ARGS__)
-#endif
 
 VideoContainer::VideoContainer(const std::string& filename) {
     openContainer(filename);
@@ -36,10 +30,13 @@ void VideoContainer::openCodecs(void* surface) {
         AVMediaCodecContext* mc_ctx = av_mediacodec_alloc_context();
         if (!mc_ctx)
             throw std::runtime_error("Failed to allocate AVMediaCodecContext");
+
+        LOG("openCodecs: calling av_mediacodec_default_init");
         av_mediacodec_default_init(video_codec_ctx_, mc_ctx, surface);
         // avcodec_default_get_format ignores hwaccel_context (AD_HOC method),
         // so AV_PIX_FMT_MEDIACODEC would never be selected without this callback.
-        video_codec_ctx_->get_format = [](AVCodecContext* ctx, const AVPixelFormat* fmts) -> AVPixelFormat {
+        video_codec_ctx_->get_format = [](AVCodecContext* ctx,
+                                          const AVPixelFormat* fmts) -> AVPixelFormat {
             for (int i = 0; fmts[i] != AV_PIX_FMT_NONE; i++) {
                 if (fmts[i] == AV_PIX_FMT_MEDIACODEC)
                     return AV_PIX_FMT_MEDIACODEC;
@@ -49,8 +46,10 @@ void VideoContainer::openCodecs(void* surface) {
     }
 #endif
 
+    // TODO we are hanging there now
     if (avcodec_open2(video_codec_ctx_, video_codec_, nullptr) < 0)
         throw std::runtime_error("Failed to open video codec");
+
     LOG("Opened video codec: %s (%s)", video_codec_->name,
         video_codec_->long_name ? video_codec_->long_name : "?");
 
@@ -75,21 +74,11 @@ void VideoContainer::allocCodecContexts() {
     for (unsigned int i = 0; i < format_ctx_->nb_streams; i++) {
         AVCodecParameters* params = format_ctx_->streams[i]->codecpar;
 
-        const AVCodec* codec = nullptr;
-#ifdef ANDROID
-
-        if (params->codec_type == AVMEDIA_TYPE_VIDEO) {
-            codec = avcodec_find_decoder_by_name("hevc_mediacodec");
-            if (!codec)
-                throw std::runtime_error("hevc_mediacodec decoder not found");
-        } else {
-            codec = avcodec_find_decoder(params->codec_id);
-        }
-#else
-        codec = avcodec_find_decoder(params->codec_id);
+        // TODO don't forget to choose MediaCodec forcefully for
+        // heavy codecs like we did in  3faaf3a05467755ec683f74f6abc5f5d9c4114ee
+        const AVCodec* codec = avcodec_find_decoder(params->codec_id);
         if (!codec)
             continue;
-#endif
 
         if (params->codec_type == AVMEDIA_TYPE_VIDEO && video_stream_index_ < 0) {
             allocVideoCodecContext(params, i, codec);

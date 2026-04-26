@@ -11,11 +11,13 @@ CompileFlags:
 
 Index:
   # Don't index CMake build dirs or Android-specific code (cross-compiled, host LSP can't handle it)
-  PathExclude: ["build/.*", "build-.*/.*", "third_party/.*", "android/.*"]
+  Index:
+    Background:
+      PathExclude: ["build/.*", "build-.*/.*", "third_party/.*", "android/.*"]
 
 Diagnostics:
   # Disable some overly aggressive warnings
-  UnusedIncludes: Experiment
+  UnusedIncludes: Strict
 
   # Clang-Tidy checks
   ClangTidy:

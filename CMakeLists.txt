@@ -54,27 +54,25 @@ foreach(lib avcodec avformat avutil swscale swresample)
     )
 endforeach()
 
-# ── Player library ────────────────────────────────────────────────────────────
+# We are still OK to have the same sources for both
+# platforms in those directories
 add_subdirectory(player)
+add_subdirectory(client)
 
-# ── Targets ───────────────────────────────────────────────────────────────────
+# This is our Android client target with JNI-specific
+# entry point that SDL provides
 if(ANDROID)
     add_library(SimpleVideoPlayer SHARED
-        android/app/src/main/cpp/android_client.cpp
-        android/app/src/main/cpp/ConnectConfig.cpp
-        android/app/src/main/cpp/ClientConnection.cpp
-        android/app/src/main/cpp/FileMenu.cpp
-        android/app/src/main/cpp/MenuRenderer.cpp
-        android/app/src/main/cpp/Parser.cpp
-        android/app/src/main/cpp/Selector.cpp
-        android/app/src/main/cpp/TextRenderer.cpp
+      android/app/src/main/cpp/android_client.cpp
     )
-    target_include_directories(SimpleVideoPlayer PRIVATE ${FFMPEG_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/android/app/src/main/cpp)
-    target_link_libraries(SimpleVideoPlayer player SDL2 log android EGL GLESv2)
-
-    add_subdirectory(android/playback-evaluation)
-
+    target_include_directories(SimpleVideoPlayer PRIVATE
+      ${CMAKE_SOURCE_DIR}/client
+      ${CMAKE_SOURCE_DIR}/player/include
+    )
+    target_link_libraries(SimpleVideoPlayer PRIVATE
+      client player avcodec avformat avutil swscale swresample
+      SDL2 log android EGL GLESv2
+    )
 else()
     add_subdirectory(server)
-
 endif()

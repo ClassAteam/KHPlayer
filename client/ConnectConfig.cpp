@@ -1,20 +1,14 @@
 #include "ConnectConfig.h"
-#include <android/log.h>
 #include <cerrno>
 #include <stdexcept>
 
-#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
-
 ConnectConfig::ConnectConfig() {
-    LOG("ConnectConfig: opening %s\n", kConfigPath);
     FILE* f = fopen(kConfigPath, "r");
     if (!f) {
-        LOG("ConnectConfig: fopen failed, errno=%d\n", errno);
         throw std::runtime_error("connection config file not found");
     }
     auto content = getFileContent(f);
     parseData(content);
-    LOG("main: server=%s port=%d\n", host_.c_str(), port_);
 }
 
 std::string ConnectConfig::getFileContent(FILE* f) {

@@ -1,5 +1,6 @@
 #include "SdlContext.h"
 #include <SDL.h>
+#include <SDL_pixels.h>
 extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
@@ -7,9 +8,9 @@ extern "C" {
 }
 #include <stdexcept>
 #ifdef __ANDROID__
-#include <android/log.h>
-#include <SDL_system.h>
 #include <EGL/egl.h>
+#include <SDL_system.h>
+#include <android/log.h>
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
 #else
 #include <cstdio>
@@ -17,8 +18,7 @@ extern "C" {
 #endif
 
 SdlContext::SdlContext(const VideoContainer& container)
-    : swr_ctx_(nullptr), window_(nullptr), renderer_(nullptr), texture_(nullptr),
-      audio_device_(0) {
+    : swr_ctx_(nullptr), window_(nullptr), renderer_(nullptr), texture_(nullptr), audio_device_(0) {
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
         throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
@@ -42,19 +42,28 @@ SdlContext::~SdlContext() {
 #ifdef __ANDROID__
     if (media_surface_ || surface_texture_) {
         JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
-        if (media_surface_)  { env->DeleteGlobalRef(media_surface_);  media_surface_  = nullptr; }
-        if (surface_texture_){ env->DeleteGlobalRef(surface_texture_); surface_texture_ = nullptr; }
+        if (media_surface_) {
+            env->DeleteGlobalRef(media_surface_);
+            media_surface_ = nullptr;
+        }
+        if (surface_texture_) {
+            env->DeleteGlobalRef(surface_texture_);
+            surface_texture_ = nullptr;
+        }
     }
-    if (quad_vbo_)       glDeleteBuffers(1, &quad_vbo_);
-    if (shader_program_) glDeleteProgram(shader_program_);
-    if (external_gl_tex_) glDeleteTextures(1, &external_gl_tex_);
+    if (quad_vbo_)
+        glDeleteBuffers(1, &quad_vbo_);
+    if (shader_program_)
+        glDeleteProgram(shader_program_);
+    if (external_gl_tex_)
+        glDeleteTextures(1, &external_gl_tex_);
 #endif
 }
 
 void SdlContext::initWindow(int width, int height) {
-    window_ = SDL_CreateWindow("Simple Video Player", SDL_WINDOWPOS_CENTERED,
-                               SDL_WINDOWPOS_CENTERED, width, height,
-                               SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    window_ =
+        SDL_CreateWindow("Simple Video Player", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                         width, height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!window_)
         throw std::runtime_error(std::string("Failed to create window: ") + SDL_GetError());
 }
@@ -66,7 +75,14 @@ void SdlContext::initRenderer() {
 }
 
 void SdlContext::createTexture(int width, int height) {
-    texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_NV12, SDL_TEXTUREACCESS_STREAMING,
+    // TODO So we just tuned this function manually to work with H.264 fixture just find.
+    // but don't forget that the commented part is working version for MediaCoded so we
+    // should make this behaviour managable/adaptable for the codecs we want to use.
+    // For now those two versions a hardcoded manual solution for two very hardcoded
+    // video pipelines (H265 using MediaCodec and H.264 in the other way).
+    // texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_NV12, SDL_TEXTUREACCESS_STREAMING,
+    //                              width, height);
+    texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING,
                                  width, height);
     if (!texture_)
         throw std::runtime_error(std::string("Failed to create texture: ") + SDL_GetError());
@@ -93,10 +109,10 @@ static const char* FRAG_SRC = R"glsl(
 
 static const float QUAD_VERTS[] = {
     // x      y     z     w      u    v
-    -1.0f, -1.0f, 0.0f, 1.0f,  0.0f, 0.0f,  // BL
-     1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 0.0f,  // BR
-    -1.0f,  1.0f, 0.0f, 1.0f,  0.0f, 1.0f,  // TL
-     1.0f,  1.0f, 0.0f, 1.0f,  1.0f, 1.0f,  // TR
+    -1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, // BL
+    1.0f,  -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, // BR
+    -1.0f, 1.0f,  0.0f, 1.0f, 0.0f, 1.0f, // TL
+    1.0f,  1.0f,  0.0f, 1.0f, 1.0f, 1.0f, // TR
 };
 
 static GLuint make_shader(GLenum type, const char* src) {
@@ -116,9 +132,10 @@ static GLuint make_shader(GLenum type, const char* src) {
 }
 
 void SdlContext::compileGLShaders() {
-    GLuint vert = make_shader(GL_VERTEX_SHADER,   VERT_SRC);
+    GLuint vert = make_shader(GL_VERTEX_SHADER, VERT_SRC);
     GLuint frag = make_shader(GL_FRAGMENT_SHADER, FRAG_SRC);
-    if (!vert || !frag) return;
+    if (!vert || !frag)
+        return;
 
     shader_program_ = glCreateProgram();
     glAttachShader(shader_program_, vert);
@@ -138,12 +155,12 @@ void SdlContext::compileGLShaders() {
         return;
     }
 
-    position_loc_   = glGetAttribLocation (shader_program_, "position");
-    texcoord_loc_   = glGetAttribLocation (shader_program_, "texCoord");
+    position_loc_ = glGetAttribLocation(shader_program_, "position");
+    texcoord_loc_ = glGetAttribLocation(shader_program_, "texCoord");
     tex_matrix_loc_ = glGetUniformLocation(shader_program_, "texMatrix");
-    video_tex_loc_  = glGetUniformLocation(shader_program_, "videoTex");
-    LOG("GL shaders compiled OK (pos=%d tc=%d tm=%d vt=%d)",
-        position_loc_, texcoord_loc_, tex_matrix_loc_, video_tex_loc_);
+    video_tex_loc_ = glGetUniformLocation(shader_program_, "videoTex");
+    LOG("GL shaders compiled OK (pos=%d tc=%d tm=%d vt=%d)", position_loc_, texcoord_loc_,
+        tex_matrix_loc_, video_tex_loc_);
 }
 
 void SdlContext::createQuadVBO() {
@@ -168,21 +185,20 @@ void* SdlContext::setupGLSurfaceRenderer() {
     // 2. Create SurfaceTexture(texId) via JNI
     JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
 
-    jclass st_cls  = env->FindClass("android/graphics/SurfaceTexture");
+    jclass st_cls = env->FindClass("android/graphics/SurfaceTexture");
     jmethodID ctor = env->GetMethodID(st_cls, "<init>", "(I)V");
     jobject st_loc = env->NewObject(st_cls, ctor, (jint)external_gl_tex_);
-    surface_texture_    = env->NewGlobalRef(st_loc);
-    update_tex_image_   = env->GetMethodID(st_cls, "updateTexImage", "()V");
+    surface_texture_ = env->NewGlobalRef(st_loc);
+    update_tex_image_ = env->GetMethodID(st_cls, "updateTexImage", "()V");
     get_transform_matrix_ = env->GetMethodID(st_cls, "getTransformMatrix", "([F)V");
     env->DeleteLocalRef(st_loc);
     env->DeleteLocalRef(st_cls);
 
     // 3. Create Surface(surfaceTexture) via JNI — passed to MediaCodec
-    jclass  surf_cls  = env->FindClass("android/view/Surface");
-    jmethodID s_ctor  = env->GetMethodID(surf_cls, "<init>",
-                                         "(Landroid/graphics/SurfaceTexture;)V");
-    jobject surf_loc  = env->NewObject(surf_cls, s_ctor, surface_texture_);
-    media_surface_    = env->NewGlobalRef(surf_loc);
+    jclass surf_cls = env->FindClass("android/view/Surface");
+    jmethodID s_ctor = env->GetMethodID(surf_cls, "<init>", "(Landroid/graphics/SurfaceTexture;)V");
+    jobject surf_loc = env->NewObject(surf_cls, s_ctor, surface_texture_);
+    media_surface_ = env->NewGlobalRef(surf_loc);
     env->DeleteLocalRef(surf_loc);
     env->DeleteLocalRef(surf_cls);
 
@@ -190,13 +206,14 @@ void* SdlContext::setupGLSurfaceRenderer() {
     compileGLShaders();
     createQuadVBO();
 
-    LOG("GL surface renderer ready: tex=%u prog=%u surface=%p",
-        external_gl_tex_, shader_program_, (void*)media_surface_);
+    LOG("GL surface renderer ready: tex=%u prog=%u surface=%p", external_gl_tex_, shader_program_,
+        (void*)media_surface_);
     return (void*)media_surface_;
 }
 
 void SdlContext::renderMediaCodecFrame() {
-    if (!shader_program_ || !external_gl_tex_) return;
+    if (!shader_program_ || !external_gl_tex_)
+        return;
 
     JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
 
@@ -247,7 +264,9 @@ void SdlContext::renderMediaCodecFrame() {
 
 #else // !__ANDROID__
 
-void* SdlContext::setupGLSurfaceRenderer() { return nullptr; }
+void* SdlContext::setupGLSurfaceRenderer() {
+    return nullptr;
+}
 void SdlContext::renderMediaCodecFrame() {}
 
 #endif // __ANDROID__
@@ -263,14 +282,18 @@ void SdlContext::audioCallback(uint8_t* stream, int len) {
 
     while ((int)audio_buf_.size() < len) {
         auto frame_opt = audio_queue_.try_pop();
-        if (!frame_opt) break;
+        if (!frame_opt)
+            break;
 
         AVFrame* frame = *frame_opt;
 
         int out_buffer_size = av_samples_get_buffer_size(nullptr, number_of_channels_,
                                                          frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
         uint8_t* output = (uint8_t*)av_malloc(out_buffer_size);
-        if (!output) { av_frame_free(&frame); break; }
+        if (!output) {
+            av_frame_free(&frame);
+            break;
+        }
 
         uint8_t* out_ptr = output;
         int out_samples = swr_convert(swr_ctx_, &out_ptr, frame->nb_samples,
@@ -313,15 +336,23 @@ void SdlContext::initAudioDevice(int sample_rate, int num_of_channels) {
 
 void SdlContext::initResamplerContext(AVChannelLayout ch_layout, int sample_rate,
                                       AVSampleFormat fmt) {
-    swr_alloc_set_opts2(&swr_ctx_, &ch_layout, AV_SAMPLE_FMT_S16, sample_rate,
-                        &ch_layout, fmt, sample_rate, 0, nullptr);
+    swr_alloc_set_opts2(&swr_ctx_, &ch_layout, AV_SAMPLE_FMT_S16, sample_rate, &ch_layout, fmt,
+                        sample_rate, 0, nullptr);
     swr_init(swr_ctx_);
 }
 
-void SdlContext::pushAudioFrame(AVFrame* frame) { audio_queue_.push(frame); }
-SDL_Renderer* SdlContext::getRenderer()    { return renderer_; }
-SDL_Texture*  SdlContext::getTexture()     { return texture_;  }
-double SdlContext::getAudioClock() const   { return audio_clock_.load(); }
-void SdlContext::pauseAudio(bool paused)   {
+void SdlContext::pushAudioFrame(AVFrame* frame) {
+    audio_queue_.push(frame);
+}
+SDL_Renderer* SdlContext::getRenderer() {
+    return renderer_;
+}
+SDL_Texture* SdlContext::getTexture() {
+    return texture_;
+}
+double SdlContext::getAudioClock() const {
+    return audio_clock_.load();
+}
+void SdlContext::pauseAudio(bool paused) {
     SDL_PauseAudioDevice(audio_device_, paused ? 1 : 0);
 }
