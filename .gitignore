@@ -20,3 +20,4 @@ build-tracy/
 fixtures/*.mkv
 fixtures/*.mp4
 fixtures/*.avi
+**/.cxx/

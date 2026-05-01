@@ -2,14 +2,14 @@
 #include <cerrno>
 #include <stdexcept>
 
-ConnectConfig::ConnectConfig() {
-    FILE* f = fopen(kConfigPath, "r");
-    if (!f) {
-        throw std::runtime_error("connection config file not found");
-    }
-    auto content = getFileContent(f);
-    parseData(content);
+ConnectConfig::ConnectConfig(const char* path) {
+    FILE* f = fopen(path, "r");
+    if (!f)
+        throw std::runtime_error(std::string("connection config file not found: ") + path);
+    parseData(getFileContent(f));
 }
+
+ConnectConfig::ConnectConfig() : ConnectConfig(kConfigPath) {}
 
 std::string ConnectConfig::getFileContent(FILE* f) {
     char buf[256] = {};

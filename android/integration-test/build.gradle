@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk 34
+    namespace 'com.simplevideoplayer.integrationtest'
+    ndkVersion "29.0.14206865"
+
+    defaultConfig {
+        applicationId "com.simplevideoplayer.integrationtest"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        ndk {
+            abiFilters 'armeabi-v7a'
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments(
+                    "-DFFMPEG_INCLUDE_DIR=${rootDir}/../third_party/ffmpeg/include",
+                    "-DFFMPEG_LIB_DIR=${rootDir}/../third_party/ffmpeg/armeabi-v7a",
+                    "-DSDL2_ANDROID_DIR=${rootDir}/../third_party/SDL2"
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "../../CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java', '../app/src/main/java/org']
+            // FFmpeg prebuilt .so files — AGP will package them into the APK
+            jniLibs.srcDirs = ["${rootDir}/../third_party/ffmpeg/android-jni"]
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+}

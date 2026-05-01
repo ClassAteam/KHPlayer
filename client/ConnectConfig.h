@@ -5,6 +5,7 @@
 class ConnectConfig {
 public:
     ConnectConfig();
+    explicit ConnectConfig(const char* path);
     const std::string& host() const { return host_; }
     int port() const { return port_; }
 
