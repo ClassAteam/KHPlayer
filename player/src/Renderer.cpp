@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "VideoContainer.h"
+#include "logging.h"
 #ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
 #endif
@@ -29,7 +30,6 @@ Renderer::Renderer(Converter& converter, SdlContext& sdl_context, std::atomic<bo
                    std::atomic<bool>& paused, AVRational avg_frame_rate)
     : converter_(converter), sdl_context_(sdl_context), quit_(quit), paused_(paused) {
 
-    texture_ = sdl_context.getTexture();
     renderer_ = sdl_context.getRenderer();
     frame_last_pts_ = 0.0;
     frame_last_delay_ = (avg_frame_rate.num > 0) ? av_q2d(av_inv_q(avg_frame_rate)) : 1.0 / 25.0;
@@ -57,8 +57,13 @@ void Renderer::renderFrame() {
         }
 
         auto result = converter_.getImage();
-        if (!result)
+        if (!result) {
+            if (converter_.isDone()) {
+                LOG("renderer: converter done, exiting render loop\n");
+                quit_ = true;
+            }
             continue;
+        }
 
         auto image = result.value();
 
@@ -89,13 +94,14 @@ void Renderer::renderFrame() {
 #endif
 
         double sdl_t0 = static_cast<double>(av_gettime()) / 1e6;
+        SDL_Texture* texture = sdl_context_.getTexture();
         if (image.frame->format == AV_PIX_FMT_NV12) {
-            if (SDL_UpdateNVTexture(texture_, nullptr,
+            if (SDL_UpdateNVTexture(texture, nullptr,
                     image.frame->data[0], image.frame->linesize[0],
                     image.frame->data[1], image.frame->linesize[1]) < 0)
                 std::cerr << "SDL_UpdateNVTexture failed: " << SDL_GetError() << std::endl;
         } else {
-            if (SDL_UpdateYUVTexture(texture_, nullptr,
+            if (SDL_UpdateYUVTexture(texture, nullptr,
                     image.frame->data[0], image.frame->linesize[0],
                     image.frame->data[1], image.frame->linesize[1],
                     image.frame->data[2], image.frame->linesize[2]) < 0)
@@ -105,7 +111,7 @@ void Renderer::renderFrame() {
             std::cerr << "SDL_SetRenderDrawColor failed: " << SDL_GetError() << std::endl;
         if (SDL_RenderClear(renderer_) < 0)
             std::cerr << "SDL_RenderClear failed: " << SDL_GetError() << std::endl;
-        if (SDL_RenderCopy(renderer_, texture_, nullptr, nullptr) < 0)
+        if (SDL_RenderCopy(renderer_, texture, nullptr, nullptr) < 0)
             std::cerr << "SDL_RenderCopy failed: " << SDL_GetError() << std::endl;
         SDL_RenderPresent(renderer_);
         stats.sdl_ms = (static_cast<double>(av_gettime()) / 1e6 - sdl_t0) * 1000.0;

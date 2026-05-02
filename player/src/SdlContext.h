@@ -24,6 +24,9 @@ public:
     // Call this after the constructor, before VideoContainer::openCodecs().
     void* setupGLSurfaceRenderer();
 
+    // Reinitialize audio and texture for a new video without recreating the window/renderer.
+    void reinitForVideo(const VideoContainer& container);
+
     // Calls SurfaceTexture.updateTexImage(), draws the GL_TEXTURE_EXTERNAL_OES
     // quad, and presents. Only does anything on Android.
     void renderMediaCodecFrame();

@@ -30,10 +30,18 @@ int main(int argc, char* argv[]) {
             throw std::runtime_error("sample not found on server " + file_name);
         VideoPlayer player(conn.streamUrl(*it));
         player.test_loop();
+
+        std::string file_name2("sample2_h265.mp4");
+        auto it2 = std::find(files.begin(), files.end(), file_name2);
+        if (it2 == files.end())
+            throw std::runtime_error("sample not found on server " + file_name2);
+        VideoPlayer player2(conn.streamUrl(*it2), player.getSdlContext());
+        player2.test_loop();
+        LOG("INTEGRATION TEST PASSED");
     } catch (const std::exception& e) {
-        LOG("FATAL: %s", e.what());
+        LOG("INTEGRATION TEST FAILED: %s", e.what());
     } catch (...) {
-        LOG("FATAL: unknown exception");
+        LOG("INTEGRATION TEST FAILED: unknown exception");
     }
     return 0;
 }

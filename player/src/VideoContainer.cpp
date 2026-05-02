@@ -53,10 +53,12 @@ void VideoContainer::openCodecs(void* surface) {
     LOG("Opened video codec: %s (%s)", video_codec_->name,
         video_codec_->long_name ? video_codec_->long_name : "?");
 
-    if (avcodec_open2(audio_codec_ctx_, audio_codec_, nullptr) < 0)
-        throw std::runtime_error("Failed to open audio codec");
-    LOG("Opened audio codec: %s (%s)", audio_codec_->name,
-        audio_codec_->long_name ? audio_codec_->long_name : "?");
+    if (audio_stream_index_ >= 0) {
+        if (avcodec_open2(audio_codec_ctx_, audio_codec_, nullptr) < 0)
+            throw std::runtime_error("Failed to open audio codec");
+        LOG("Opened audio codec: %s (%s)", audio_codec_->name,
+            audio_codec_->long_name ? audio_codec_->long_name : "?");
+    }
 }
 
 void VideoContainer::openContainer(const std::string& filename) {
@@ -143,6 +145,9 @@ AVSampleFormat VideoContainer::sampleFormat() const {
 
 AVFormatContext* VideoContainer::getFormatContext() const {
     return format_ctx_;
+}
+bool VideoContainer::hasAudio() const {
+    return audio_stream_index_ >= 0;
 }
 int VideoContainer::getVideoStreamIndex() const {
     return video_stream_index_;

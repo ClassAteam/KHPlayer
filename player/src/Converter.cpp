@@ -1,5 +1,6 @@
 #include "Converter.h"
 #include "utility.h"
+#include "logging.h"
 #include <iostream>
 #include <ostream>
 extern "C" {
@@ -22,7 +23,6 @@ Converter::~Converter() {
 
 void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& /*paused*/) {
     while (!quit) {
-
         {
             auto frame = decoder_.getFrame();
             if (!frame)
@@ -45,6 +45,7 @@ void Converter::convert(std::atomic<bool>& quit, std::atomic<bool>& /*paused*/) 
             av_frame_free(&recieved_frame->frame);
         }
     }
+    display_queue_.close();
 }
 
 std::optional<VideoFrame> Converter::convertFrame(Frame* frame) {
@@ -62,10 +63,8 @@ std::optional<VideoFrame> Converter::convertFrame(Frame* frame) {
     // Slow path: convert to NV12 (10-bit, YUYV, etc.)
     if (!scaler_ctx_) {
         TIMING_LOG("[converter] slow path: format=%d, creating scaler\n", fmt);
-        scaler_ctx_ = sws_getContext(frame_width_, frame_height_, fmt,
-                                     frame_width_, frame_height_,
-                                     AV_PIX_FMT_NV12, SWS_FAST_BILINEAR,
-                                     nullptr, nullptr, nullptr);
+        scaler_ctx_ = sws_getContext(frame_width_, frame_height_, fmt, frame_width_, frame_height_,
+                                     AV_PIX_FMT_NV12, SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
         if (!scaler_ctx_) {
             std::cerr << "sws_getContext failed" << std::endl;
             return std::nullopt;
@@ -84,15 +83,16 @@ std::optional<VideoFrame> Converter::convertFrame(Frame* frame) {
         return std::nullopt;
     }
 
-    static int    scale_count = 0;
-    static double scale_sum   = 0;
+    static int scale_count = 0;
+    static double scale_sum = 0;
     double scale_t0 = av_gettime() / 1e6;
     int height_ret = sws_scale(scaler_ctx_, frame->frame->data, frame->frame->linesize, 0,
                                frame_height_, yuv->data, yuv->linesize);
     scale_sum += av_gettime() / 1e6 - scale_t0;
     if (++scale_count >= 30) {
         TIMING_LOG("[converter] sws_scale avg=%.1fms\n", scale_sum / 30 * 1000.0);
-        scale_count = 0; scale_sum = 0;
+        scale_count = 0;
+        scale_sum = 0;
     }
 
     if (height_ret != frame_height_) {
@@ -110,5 +110,10 @@ std::optional<VideoFrame> Converter::getImage() {
 }
 
 void Converter::close() {
+    LOG("converter: exiting, closing display_queue_\n");
     display_queue_.close();
+}
+
+bool Converter::isDone() const {
+    return display_queue_.isClosed() && display_queue_.empty();
 }

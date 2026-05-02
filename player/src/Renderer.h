@@ -25,7 +25,6 @@ private:
     void delay(double pts, FrameStats& stats);
     void printStats(const FrameStats& stats);
 
-    SDL_Texture* texture_;
     SDL_Renderer* renderer_;
     Converter& converter_;
     SdlContext& sdl_context_;

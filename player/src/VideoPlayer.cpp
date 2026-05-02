@@ -13,25 +13,50 @@ extern "C" {
 }
 #endif
 
-VideoPlayer::VideoPlayer(const std::string& filename)
-    : decoder_(filename), sdl_context_(decoder_.getContainer()), converter_(decoder_),
-      renderer_(converter_, sdl_context_, quit_, paused_,
-                decoder_.getContainer().averageFrameRate()) {
-    void* surface = nullptr;
+static void android_setup_jni(SdlContext& ctx, VideoContainer& container) {
 #ifdef ANDROID
     JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
     JavaVM* vm = nullptr;
     env->GetJavaVM(&vm);
     av_jni_set_java_vm(vm, nullptr);
-
-    surface = sdl_context_.setupGLSurfaceRenderer();
+    void* surface = ctx.setupGLSurfaceRenderer();
     LOG("openCodecs: entering");
+    container.openCodecs(surface);
+#else
+    container.openCodecs(nullptr);
 #endif
-    decoder_.getContainer().openCodecs(surface);
     LOG("codec are opened");
 }
 
+VideoPlayer::VideoPlayer(const std::string& filename)
+    : decoder_(filename),
+      sdl_context_owned_(std::in_place, decoder_.getContainer()),
+      sdl_context_(&*sdl_context_owned_),
+      converter_(decoder_),
+      renderer_(converter_, *sdl_context_, quit_, paused_,
+                decoder_.getContainer().averageFrameRate()) {
+    android_setup_jni(*sdl_context_, decoder_.getContainer());
+}
+
+VideoPlayer::VideoPlayer(const std::string& filename, SdlContext& ctx)
+    : decoder_(filename),
+      sdl_context_owned_(std::nullopt),
+      sdl_context_(&ctx),
+      converter_(decoder_),
+      renderer_(converter_, *sdl_context_, quit_, paused_,
+                decoder_.getContainer().averageFrameRate()) {
+    LOG("player2: constructor body reached");
+    sdl_context_->reinitForVideo(decoder_.getContainer());
+    LOG("player2: reinitForVideo done");
+    android_setup_jni(*sdl_context_, decoder_.getContainer());
+    LOG("player2: android_setup_jni done");
+}
+
 VideoPlayer::~VideoPlayer() = default;
+
+SdlContext& VideoPlayer::getSdlContext() {
+    return *sdl_context_;
+}
 
 void VideoPlayer::test() {
     std::thread decoding([this]() {
@@ -58,7 +83,7 @@ void VideoPlayer::test() {
             auto frame = decoder_.getAudioFrame();
             if (!frame)
                 break;
-            sdl_context_.pushAudioFrame(*frame);
+            sdl_context_->pushAudioFrame(*frame);
         }
     });
 
@@ -76,7 +101,7 @@ void VideoPlayer::test_loop() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Decoder");
 #endif
-        decoder_.decode(quit_, true);
+        decoder_.decode(quit_, false);
     });
 
     std::thread receive([this]() {
@@ -98,7 +123,7 @@ void VideoPlayer::test_loop() {
             auto frame = decoder_.getAudioFrame();
             if (!frame)
                 break;
-            sdl_context_.pushAudioFrame(*frame);
+            sdl_context_->pushAudioFrame(*frame);
         }
     });
 

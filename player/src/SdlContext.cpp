@@ -7,39 +7,47 @@ extern "C" {
 #include <libavutil/samplefmt.h>
 }
 #include <stdexcept>
+#include "logging.h"
 #ifdef __ANDROID__
 #include <EGL/egl.h>
 #include <SDL_system.h>
-#include <android/log.h>
-#define LOG(...) __android_log_print(ANDROID_LOG_INFO, "SimpleVideoPlayer", __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOG(...) printf(__VA_ARGS__)
 #endif
 
 SdlContext::SdlContext(const VideoContainer& container)
     : swr_ctx_(nullptr), window_(nullptr), renderer_(nullptr), texture_(nullptr), audio_device_(0) {
 
+    LOG("SdlContext: SDL_Init");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
         throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
-
+    LOG("SdlContext: initWindow");
     initWindow(container.getWidth(), container.getHeight());
+    LOG("SdlContext: initRenderer");
     initRenderer();
     number_of_channels_ = container.getNumberOfChannels();
     sample_rate_ = container.sampleRate();
     time_base_ = container.audioTimeBase();
+    LOG("SdlContext: initAudioDevice");
     initAudioDevice(container.sampleRate(), container.getNumberOfChannels());
+    LOG("SdlContext: createTexture");
     createTexture(container.getWidth(), container.getHeight());
     SDL_RaiseWindow(window_);
     SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
+    LOG("SdlContext: initResamplerContext");
     initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
                          container.sampleFormat());
+    LOG("SdlContext: done");
 }
 
 SdlContext::~SdlContext() {
     SDL_PauseAudioDevice(audio_device_, 1);
     SDL_CloseAudioDevice(audio_device_);
 #ifdef __ANDROID__
+    if (quad_vbo_)
+        glDeleteBuffers(1, &quad_vbo_);
+    if (shader_program_)
+        glDeleteProgram(shader_program_);
+    if (external_gl_tex_)
+        glDeleteTextures(1, &external_gl_tex_);
     if (media_surface_ || surface_texture_) {
         JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
         if (media_surface_) {
@@ -51,13 +59,10 @@ SdlContext::~SdlContext() {
             surface_texture_ = nullptr;
         }
     }
-    if (quad_vbo_)
-        glDeleteBuffers(1, &quad_vbo_);
-    if (shader_program_)
-        glDeleteProgram(shader_program_);
-    if (external_gl_tex_)
-        glDeleteTextures(1, &external_gl_tex_);
 #endif
+    if (texture_) SDL_DestroyTexture(texture_);
+    if (renderer_) SDL_DestroyRenderer(renderer_);
+    if (window_) SDL_DestroyWindow(window_);
 }
 
 void SdlContext::initWindow(int width, int height) {
@@ -170,8 +175,48 @@ void SdlContext::createQuadVBO() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+void SdlContext::reinitForVideo(const VideoContainer& container) {
+    LOG("reinit: pause audio");
+    SDL_PauseAudioDevice(audio_device_, 1);
+    LOG("reinit: drain queue");
+    while (auto frame = audio_queue_.try_pop())
+        av_frame_free(&(*frame));
+    LOG("reinit: clear buf");
+    audio_buf_.clear();
+    audio_buf_start_pts_ = 0.0;
+    audio_clock_.store(0.0);
+    LOG("reinit: free swr");
+    if (swr_ctx_) { swr_free(&swr_ctx_); swr_ctx_ = nullptr; }
+    LOG("reinit: destroy texture");
+    if (texture_) { SDL_DestroyTexture(texture_); texture_ = nullptr; }
+    LOG("reinit: createTexture");
+    createTexture(container.getWidth(), container.getHeight());
+    SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
+    if (container.hasAudio()) {
+        LOG("reinit: set params");
+        number_of_channels_ = container.getNumberOfChannels();
+        sample_rate_ = container.sampleRate();
+        time_base_ = container.audioTimeBase();
+        LOG("reinit: initResamplerContext");
+        initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
+                             container.sampleFormat());
+        LOG("reinit: unpause audio");
+        SDL_PauseAudioDevice(audio_device_, 0);
+    } else {
+        LOG("reinit: no audio stream");
+    }
+    LOG("reinit: done");
+}
+
 void* SdlContext::setupGLSurfaceRenderer() {
     SDL_GetWindowSize(window_, &window_width_, &window_height_);
+
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    if (media_surface_) { env->DeleteGlobalRef(media_surface_); media_surface_ = nullptr; }
+    if (surface_texture_) { env->DeleteGlobalRef(surface_texture_); surface_texture_ = nullptr; }
+    if (external_gl_tex_) { glDeleteTextures(1, &external_gl_tex_); external_gl_tex_ = 0; }
+    if (quad_vbo_) { glDeleteBuffers(1, &quad_vbo_); quad_vbo_ = 0; }
+    if (shader_program_) { glDeleteProgram(shader_program_); shader_program_ = 0; }
 
     // 1. Create GL texture that SurfaceTexture will write into
     glGenTextures(1, &external_gl_tex_);
@@ -183,8 +228,6 @@ void* SdlContext::setupGLSurfaceRenderer() {
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
 
     // 2. Create SurfaceTexture(texId) via JNI
-    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
-
     jclass st_cls = env->FindClass("android/graphics/SurfaceTexture");
     jmethodID ctor = env->GetMethodID(st_cls, "<init>", "(I)V");
     jobject st_loc = env->NewObject(st_cls, ctor, (jint)external_gl_tex_);

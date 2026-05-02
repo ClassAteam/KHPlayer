@@ -104,5 +104,18 @@ logcat_cmd = ["adb", "-s", TV_ADDR, "logcat"]
 if pid:
     logcat_cmd += ["--pid", pid]
 logcat_cmd += ["-s", "SimpleVideoPlayer:V", "AndroidRuntime:E", "System.err:W", "DEBUG:E"]
-logcat_proc = subprocess.Popen(logcat_cmd)
-server_proc.wait()
+logcat_proc = subprocess.Popen(logcat_cmd, stdout=subprocess.PIPE, text=True)
+
+exit_code = 0
+for line in logcat_proc.stdout:
+    print(line, end="", flush=True)
+    if "INTEGRATION TEST PASSED" in line:
+        print("==> Integration test passed.")
+        break
+    if "INTEGRATION TEST FAILED" in line:
+        print("==> Integration test FAILED.")
+        exit_code = 1
+        break
+
+logcat_proc.terminate()
+sys.exit(exit_code)

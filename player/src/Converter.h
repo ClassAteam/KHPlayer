@@ -19,6 +19,7 @@ public:
     void convert(std::atomic<bool>& quit, std::atomic<bool>& paused);
     std::optional<VideoFrame> getImage();
     void close();
+    bool isDone() const;
 
 private:
     std::optional<VideoFrame> convertFrame(Frame* frame);

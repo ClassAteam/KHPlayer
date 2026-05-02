@@ -24,6 +24,7 @@ public:
     AVChannelLayout channelLayout() const;
     int sampleRate() const;
     AVSampleFormat sampleFormat() const;
+    bool hasAudio() const;
     int getVideoStreamIndex() const;
     int getAudioStreamIndex() const;
     AVCodecContext* getVideoCodecContext() const;

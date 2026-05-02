@@ -13,3 +13,10 @@
 # State so far
 - The whole interaction pipeline from starting a client and obtaining information about video files from the server to playing back the heaviest compression codecs was tested on our machines and systems.
 - MediaCodec is properly initialized and performs well on our test hardware with HEVC (H.265) via the `hevc_mediacodec` decoder.
+
+# Suitable place for getting engaged into development.
+- Automation/deployment/testing scripts in [scripts](./scripts) should be obvious enough to untangle any current intentions and flow.
+
+# Flaws
+- Testing and deployment tools are hardcoded and tailored for our particular hardware and local network. Generalization and tailoring tools will be available soon as well.
+For now a developer can just change hardcoded values as soon as they encounter an error in the deployment/testing scripts. We make sure that these errors are obvious and meaningful enough for every programmer engaged into media/crossplatform/embedded software development.

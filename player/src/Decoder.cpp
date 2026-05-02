@@ -54,6 +54,7 @@ void Decoder::decode(std::atomic<bool>& quit, bool loop) {
     }
 
     decoding_complete_ = true;
+    LOG("decoder: EOF, closing queues\n");
     video_queue_.close();
     audio_queue_.close();
 }
