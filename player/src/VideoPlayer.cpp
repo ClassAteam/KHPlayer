@@ -20,36 +20,26 @@ static void android_setup_jni(SdlContext& ctx, VideoContainer& container) {
     env->GetJavaVM(&vm);
     av_jni_set_java_vm(vm, nullptr);
     void* surface = ctx.setupGLSurfaceRenderer();
-    LOG("openCodecs: entering");
     container.openCodecs(surface);
 #else
     container.openCodecs(nullptr);
 #endif
-    LOG("codec are opened");
 }
 
 VideoPlayer::VideoPlayer(const std::string& filename)
-    : decoder_(filename),
-      sdl_context_owned_(std::in_place, decoder_.getContainer()),
-      sdl_context_(&*sdl_context_owned_),
-      converter_(decoder_),
+    : decoder_(filename), sdl_context_owned_(std::in_place, decoder_.getContainer()),
+      sdl_context_(&*sdl_context_owned_), converter_(decoder_),
       renderer_(converter_, *sdl_context_, quit_, paused_,
                 decoder_.getContainer().averageFrameRate()) {
     android_setup_jni(*sdl_context_, decoder_.getContainer());
 }
 
 VideoPlayer::VideoPlayer(const std::string& filename, SdlContext& ctx)
-    : decoder_(filename),
-      sdl_context_owned_(std::nullopt),
-      sdl_context_(&ctx),
-      converter_(decoder_),
-      renderer_(converter_, *sdl_context_, quit_, paused_,
-                decoder_.getContainer().averageFrameRate()) {
-    LOG("player2: constructor body reached");
+    : decoder_(filename), sdl_context_owned_(std::nullopt), sdl_context_(&ctx),
+      converter_(decoder_), renderer_(converter_, *sdl_context_, quit_, paused_,
+                                      decoder_.getContainer().averageFrameRate()) {
     sdl_context_->reinitForVideo(decoder_.getContainer());
-    LOG("player2: reinitForVideo done");
     android_setup_jni(*sdl_context_, decoder_.getContainer());
-    LOG("player2: android_setup_jni done");
 }
 
 VideoPlayer::~VideoPlayer() = default;
@@ -63,7 +53,7 @@ void VideoPlayer::test() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Decoder");
 #endif
-        decoder_.decode(quit_);
+        decoder_.decode();
     });
     std::thread receive([this]() {
 #ifdef TRACY_ENABLE
@@ -101,7 +91,7 @@ void VideoPlayer::test_loop() {
 #ifdef TRACY_ENABLE
         tracy::SetThreadName("Decoder");
 #endif
-        decoder_.decode(quit_, false);
+        decoder_.decode();
     });
 
     std::thread receive([this]() {

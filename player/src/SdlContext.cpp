@@ -5,9 +5,10 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/samplefmt.h>
+#include <libavutil/time.h>
 }
-#include <stdexcept>
 #include "logging.h"
+#include <stdexcept>
 #ifdef __ANDROID__
 #include <EGL/egl.h>
 #include <SDL_system.h>
@@ -16,26 +17,19 @@ extern "C" {
 SdlContext::SdlContext(const VideoContainer& container)
     : swr_ctx_(nullptr), window_(nullptr), renderer_(nullptr), texture_(nullptr), audio_device_(0) {
 
-    LOG("SdlContext: SDL_Init");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
         throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
-    LOG("SdlContext: initWindow");
     initWindow(container.getWidth(), container.getHeight());
-    LOG("SdlContext: initRenderer");
     initRenderer();
     number_of_channels_ = container.getNumberOfChannels();
     sample_rate_ = container.sampleRate();
     time_base_ = container.audioTimeBase();
-    LOG("SdlContext: initAudioDevice");
     initAudioDevice(container.sampleRate(), container.getNumberOfChannels());
-    LOG("SdlContext: createTexture");
     createTexture(container.getWidth(), container.getHeight());
     SDL_RaiseWindow(window_);
     SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
-    LOG("SdlContext: initResamplerContext");
     initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
                          container.sampleFormat());
-    LOG("SdlContext: done");
 }
 
 SdlContext::~SdlContext() {
@@ -60,9 +54,12 @@ SdlContext::~SdlContext() {
         }
     }
 #endif
-    if (texture_) SDL_DestroyTexture(texture_);
-    if (renderer_) SDL_DestroyRenderer(renderer_);
-    if (window_) SDL_DestroyWindow(window_);
+    if (texture_)
+        SDL_DestroyTexture(texture_);
+    if (renderer_)
+        SDL_DestroyRenderer(renderer_);
+    if (window_)
+        SDL_DestroyWindow(window_);
 }
 
 void SdlContext::initWindow(int width, int height) {
@@ -176,47 +173,56 @@ void SdlContext::createQuadVBO() {
 }
 
 void SdlContext::reinitForVideo(const VideoContainer& container) {
-    LOG("reinit: pause audio");
     SDL_PauseAudioDevice(audio_device_, 1);
-    LOG("reinit: drain queue");
     while (auto frame = audio_queue_.try_pop())
         av_frame_free(&(*frame));
-    LOG("reinit: clear buf");
     audio_buf_.clear();
     audio_buf_start_pts_ = 0.0;
     audio_clock_.store(0.0);
-    LOG("reinit: free swr");
-    if (swr_ctx_) { swr_free(&swr_ctx_); swr_ctx_ = nullptr; }
-    LOG("reinit: destroy texture");
-    if (texture_) { SDL_DestroyTexture(texture_); texture_ = nullptr; }
-    LOG("reinit: createTexture");
+    audio_clock_update_time_.store(0.0);
+    if (swr_ctx_) {
+        swr_free(&swr_ctx_);
+        swr_ctx_ = nullptr;
+    }
+    if (texture_) {
+        SDL_DestroyTexture(texture_);
+        texture_ = nullptr;
+    }
     createTexture(container.getWidth(), container.getHeight());
     SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_NONE);
     if (container.hasAudio()) {
-        LOG("reinit: set params");
         number_of_channels_ = container.getNumberOfChannels();
         sample_rate_ = container.sampleRate();
         time_base_ = container.audioTimeBase();
-        LOG("reinit: initResamplerContext");
         initResamplerContext(container.channelLayout(), container.getNumberOfChannels(),
                              container.sampleFormat());
-        LOG("reinit: unpause audio");
-        SDL_PauseAudioDevice(audio_device_, 0);
-    } else {
-        LOG("reinit: no audio stream");
     }
-    LOG("reinit: done");
 }
 
 void* SdlContext::setupGLSurfaceRenderer() {
     SDL_GetWindowSize(window_, &window_width_, &window_height_);
 
     JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
-    if (media_surface_) { env->DeleteGlobalRef(media_surface_); media_surface_ = nullptr; }
-    if (surface_texture_) { env->DeleteGlobalRef(surface_texture_); surface_texture_ = nullptr; }
-    if (external_gl_tex_) { glDeleteTextures(1, &external_gl_tex_); external_gl_tex_ = 0; }
-    if (quad_vbo_) { glDeleteBuffers(1, &quad_vbo_); quad_vbo_ = 0; }
-    if (shader_program_) { glDeleteProgram(shader_program_); shader_program_ = 0; }
+    if (media_surface_) {
+        env->DeleteGlobalRef(media_surface_);
+        media_surface_ = nullptr;
+    }
+    if (surface_texture_) {
+        env->DeleteGlobalRef(surface_texture_);
+        surface_texture_ = nullptr;
+    }
+    if (external_gl_tex_) {
+        glDeleteTextures(1, &external_gl_tex_);
+        external_gl_tex_ = 0;
+    }
+    if (quad_vbo_) {
+        glDeleteBuffers(1, &quad_vbo_);
+        quad_vbo_ = 0;
+    }
+    if (shader_program_) {
+        glDeleteProgram(shader_program_);
+        shader_program_ = 0;
+    }
 
     // 1. Create GL texture that SurfaceTexture will write into
     glGenTextures(1, &external_gl_tex_);
@@ -355,6 +361,7 @@ void SdlContext::audioCallback(uint8_t* stream, int len) {
     int copy_size = std::min((int)audio_buf_.size(), len);
     if (copy_size > 0) {
         audio_clock_.store(audio_buf_start_pts_);
+        audio_clock_update_time_.store(static_cast<double>(av_gettime()) / 1e6);
         SDL_MixAudioFormat(stream, audio_buf_.data(), AUDIO_S16SYS, copy_size, SDL_MIX_MAXVOLUME);
         audio_buf_.erase(audio_buf_.begin(), audio_buf_.begin() + copy_size);
         audio_buf_start_pts_ +=
@@ -374,7 +381,6 @@ void SdlContext::initAudioDevice(int sample_rate, int num_of_channels) {
     audio_device_ = SDL_OpenAudioDevice(nullptr, 0, &wanted_spec, &obtained_spec, 0);
     if (audio_device_ == 0)
         throw std::runtime_error(std::string("Failed to open audio device: ") + SDL_GetError());
-    SDL_PauseAudioDevice(audio_device_, 0);
 }
 
 void SdlContext::initResamplerContext(AVChannelLayout ch_layout, int sample_rate,
@@ -394,7 +400,13 @@ SDL_Texture* SdlContext::getTexture() {
     return texture_;
 }
 double SdlContext::getAudioClock() const {
-    return audio_clock_.load();
+    double clock = audio_clock_.load();
+    double update_time = audio_clock_update_time_.load();
+    if (update_time > 0.0) {
+        double now = static_cast<double>(av_gettime()) / 1e6;
+        clock += now - update_time;
+    }
+    return clock;
 }
 void SdlContext::pauseAudio(bool paused) {
     SDL_PauseAudioDevice(audio_device_, paused ? 1 : 0);

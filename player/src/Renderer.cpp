@@ -72,6 +72,7 @@ void Renderer::renderFrame() {
         if (first_frame) {
             frame_timer_ = frame_start;
             first_frame = false;
+            sdl_context_.pauseAudio(false);
         }
 
         FrameStats stats;
@@ -162,7 +163,7 @@ void Renderer::delay(double pts, FrameStats& stats) {
     double audio_clock = sdl_context_.getAudioClock();
     double diff = pts - audio_clock;
     double sync_threshold = std::max(delay, 0.01);
-    if (fabs(diff) < 10.0 && fabs(diff) > sync_threshold) {
+    if (fabs(diff) < 0.1 && fabs(diff) > sync_threshold) {
         double max_step = delay * 0.5;
         double correction = std::max(-max_step, std::min(max_step, diff));
         delay = std::max(0.0, delay + correction);

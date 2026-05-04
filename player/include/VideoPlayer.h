@@ -1,8 +1,8 @@
 #pragma once
-#include "Decoder.h"
-#include "SdlContext.h"
 #include "Converter.h"
+#include "Decoder.h"
 #include "Renderer.h"
+#include "SdlContext.h"
 #include <atomic>
 #include <optional>
 #include <string>

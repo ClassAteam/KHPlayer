@@ -14,13 +14,10 @@ extern "C" {
 
 int main(int argc, char* argv[]) {
     try {
-        LOG("integration test starting");
-        ConnectConfig config("/sdcard/Android/data/com.simplevideoplayer.integrationtest/files/svp_server.txt");
-        LOG("config loaded: %s", config.host().c_str());
+        ConnectConfig config(
+            "/sdcard/Android/data/com.simplevideoplayer.integrationtest/files/svp_server.txt");
         ClientConnection conn(config);
-        LOG("connection created");
         auto files = conn.retrieveFiles();
-        LOG("receiving file list");
         for (const auto& f : files)
             LOG("  %s", f.c_str());
 
